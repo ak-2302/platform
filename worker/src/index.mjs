@@ -97,7 +97,7 @@ export default {
       const current = await loadProposals(env);
       const number = 43 + current.length;
       const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'change';
-      const proposal = { id: `#${number}`, title: input.title.trim(), description: input.description || '', author: 'you', status: 'Draft', branch: `proposal/${number}-${slug}`, baseSha: manifest.baseSha, headSha: `worker-${Date.now().toString(16)}`, render: 'queued' };
+      const proposal = { id: `#${number}`, title: input.title.trim(), description: input.description || '', projectSnapshot: input.projectSnapshot || null, author: 'you', status: 'Draft', branch: `proposal/${number}-${slug}`, baseSha: manifest.baseSha, headSha: `worker-${Date.now().toString(16)}`, render: 'queued' };
       proposals.unshift(proposal);
       await storeProposal(env, proposal);
       return json(proposal, 201);
