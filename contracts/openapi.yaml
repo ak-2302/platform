@@ -1,0 +1,141 @@
+openapi: 3.1.0
+info:
+  title: Collaborative Open Music API
+  version: 0.1.0
+  description: |
+    Contract for collaborative creation, publishing, and remixing of open music.
+servers:
+  - url: https://api.example.com
+paths:
+  /v1/sessions:
+    post:
+      summary: Create a collaboration session
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+  /v1/sessions/{sessionId}/events:
+    post:
+      summary: Append collaboration event
+      operationId: appendSessionEvent
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionEvent'
+      responses:
+        '202':
+          description: Event accepted
+  /v1/tracks:
+    post:
+      summary: Publish a track from a session
+      operationId: publishTrack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishTrackRequest'
+      responses:
+        '201':
+          description: Track published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Track'
+  /v1/tracks/{trackId}:
+    get:
+      summary: Read published track metadata
+      operationId: getTrack
+      parameters:
+        - name: trackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Track metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Track'
+components:
+  schemas:
+    CreateSessionRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        bpm:
+          type: integer
+          minimum: 20
+          maximum: 400
+    Session:
+      type: object
+      required: [id, title, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    SessionEvent:
+      type: object
+      required: [kind, payload]
+      properties:
+        kind:
+          type: string
+          enum: [note.added, note.removed, clip.replaced, comment.added]
+        payload:
+          type: object
+          additionalProperties: true
+    PublishTrackRequest:
+      type: object
+      required: [sessionId, title, license]
+      properties:
+        sessionId:
+          type: string
+        title:
+          type: string
+          minLength: 1
+        license:
+          type: string
+          enum: [CC0-1.0, CC-BY-4.0]
+    Track:
+      type: object
+      required: [id, title, license, publishedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        license:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        remixOfTrackId:
+          type: string
+          nullable: true
