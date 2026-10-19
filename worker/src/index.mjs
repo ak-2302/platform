@@ -67,7 +67,8 @@ export default {
     }
     const pullRequest = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/pull-request$/);
     if (pullRequest && request.method === 'POST') {
-      const proposal = proposals.find((item) => item.id === `#${pullRequest[1]}`);
+      const input = await request.json().catch(() => ({}));
+      const proposal = proposals.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
       if (!proposal) return json({ error: 'proposal not found' }, 404);
       if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
       try {
