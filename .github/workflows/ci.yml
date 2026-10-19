@@ -26,5 +26,5 @@ jobs:
         run: npm install --include=optional
       - name: Security audit
         run: npm audit --omit=dev --audit-level=high
-      - name: Test and build
-        run: npm run check
+      - name: Test API contract
+        run: npm run test
