@@ -108,7 +108,11 @@ export default {
       if (!input.title?.trim()) return json({ error: 'title is required' }, 400);
       if (input.title.trim().length > 120) return json({ error: 'title is too long' }, 400);
       if (String(input.description || '').length > 5000) return json({ error: 'description is too long' }, 400);
-      if (input.projectSnapshot?.snapshot?.contentBase64?.length > MAX_SNAPSHOT_BASE64_BYTES || input.projectSnapshot?.contentBase64?.length > MAX_SNAPSHOT_BASE64_BYTES) return json({ error: 'openDAW project snapshot is too large' }, 413);
+      const snapshot = input.projectSnapshot;
+      if (snapshot) {
+        if (snapshot.format !== 'opendaw-bundle-v1' || typeof snapshot.contentBase64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(snapshot.contentBase64)) return json({ error: 'invalid openDAW project snapshot' }, 400);
+        if (snapshot.contentBase64.length > MAX_SNAPSHOT_BASE64_BYTES) return json({ error: 'openDAW project snapshot is too large' }, 413);
+      }
       const current = await loadProposals(env);
       const number = 43 + current.length;
       const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'change';
