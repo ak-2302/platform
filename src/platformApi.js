@@ -1,5 +1,9 @@
 const KEY = 'resonance-proposals';
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8787';
+// Keep local development convenient while ensuring a deployed build never
+// points a visitor's browser at localhost. Set VITE_API_BASE only when the
+// API is deployed on a separate origin; otherwise the same-origin worker is
+// used in production.
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://127.0.0.1:8787');
 const seed = [{id:'#42',title:'Bring the bassline forward in verse 2',author:'Mika Ito',status:'Ready for review',branch:'proposal/42-bassline',baseSha:'25af248f',headSha:'d4c91a'}];
 export const songManifest = {id:'night-transit',projectPath:'project/main.od',baseSha:'25af248f',engineCommit:'25af248f6df66b321f921b54930f94fe5c09898f',rendererVersion:'renderer-local-0.1.0'};
 export function listProposals(){try{return JSON.parse(localStorage.getItem(KEY))||seed}catch{return seed}}
