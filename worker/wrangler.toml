@@ -1,6 +1,6 @@
 name = "resonance-api"
 main = "src/index.mjs"
-compatibility_date = "2026-10-20"
+compatibility_date = "2026-10-19"
 
 [vars]
 # Set these as encrypted secrets in production, not in this file.
