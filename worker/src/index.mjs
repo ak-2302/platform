@@ -1,6 +1,6 @@
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' },
 });
 
 const manifest = {
@@ -55,7 +55,7 @@ export default {
       const body = await request.text();
       const signature = await signJob(env.PI_RENDERER_SECRET, body);
       const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
-      return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json' } });
+      return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
     }
     const proposalRender = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/render$/);
     if (proposalRender && request.method === 'POST') {
@@ -69,7 +69,7 @@ export default {
     if (jobMatch && request.method === 'GET') {
       if (!env.PI_RENDERER_URL) return json({ error: 'Pi renderer is not configured' }, 503);
       const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs/${encodeURIComponent(jobMatch[1])}`);
-      return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json' } });
+      return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
     }
     return json({ error: 'not found' }, 404);
   },
