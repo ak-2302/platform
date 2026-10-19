@@ -7,7 +7,7 @@ const manifest = {
   id: 'night-transit',
   title: 'Night Transit',
     baseSha: 'af11c3460d2c41c2f20a0f9bb18f98678f5073b2',
-  engineCommit: '402171eb2af84713d9e640a1915740e8e1b76d6d',
+  engineCommit: 'b9e8190b8b1a9da3fcac2d7ebf4c0fe9a821fe5b',
   projectPath: 'project/main.od',
   rendererVersion: 'renderer-local-0.1.0',
 };
