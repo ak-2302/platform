@@ -149,6 +149,18 @@ export default {
         try { await env.DB.prepare('INSERT INTO webhook_events (delivery_id, event_name, received_at) VALUES (?1, ?2, ?3)').bind(delivery, request.headers.get('x-github-event') || 'unknown', Date.now()).run(); }
         catch (error) { if (String(error?.message || error).toLowerCase().includes('unique')) return json({ accepted: true, duplicate: true }); throw error; }
       }
+      if (request.headers.get('x-github-event') === 'pull_request') {
+        const event = JSON.parse(body || '{}');
+        const branch = event.pull_request?.head?.ref;
+        const proposalList = await loadProposals(env);
+        const proposal = proposalList.find((item) => item.branch === branch);
+        if (proposal) {
+          if (event.action === 'closed') proposal.status = event.pull_request?.merged ? 'Merged' : 'Closed';
+          else if (['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(event.action)) proposal.status = 'Ready for review';
+          proposal.pullRequest = { number: event.pull_request.number, url: event.pull_request.html_url };
+          await storeProposal(env, proposal);
+        }
+      }
       return json({ accepted: true, duplicate: false });
     }
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
