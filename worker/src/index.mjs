@@ -69,12 +69,13 @@ function previewWav(mode) {
 }
 
 async function githubRequest(env, path, options = {}) {
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) throw new Error('GitHub integration is not configured');
+  const token = env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN;
+  if (!token || !env.GITHUB_REPOSITORY) throw new Error('GitHub integration is not configured');
   const response = await fetch(`https://api.github.com${path}`, {
     ...options,
     headers: {
       accept: 'application/vnd.github+json',
-      authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      authorization: `Bearer ${token}`,
       'x-github-api-version': '2022-11-28',
       ...options.headers,
     },
@@ -96,7 +97,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL ? 'tailscale-pi' : 'unconfigured' });
-    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPOSITORY), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN) && env.GITHUB_REPOSITORY), githubAuthMode: env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured'), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits);
@@ -122,7 +123,7 @@ export default {
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
       if (!proposal) return json({ error: 'proposal not found' }, 404);
-      if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
+      if (!(env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN) || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
       if (!proposal.projectSnapshot?.contentBase64) return json({ error: 'openDAW project snapshot is required before creating a pull request' }, 422);
       try {
         const [owner, repo] = env.GITHUB_REPOSITORY.split('/');
