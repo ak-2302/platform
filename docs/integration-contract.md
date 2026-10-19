@@ -7,6 +7,10 @@ The platform sends same-origin `postMessage` events with these types:
 - `resonance:open-project`: `{ songId, path, engineCommit }`
 - `resonance:request-project-snapshot`: `{ songId }`
 
+openDAW returns `{ type: "resonance:project-snapshot", songId, snapshotId,
+snapshot }` to the same origin. The platform ignores messages from any other
+origin and rejects empty snapshots or responses that exceed the timeout.
+
 The production adapter must validate `event.origin`, pin the engine commit from `song.json`, and return a project snapshot without exposing GitHub credentials.
 
 ## Proposal API boundary
