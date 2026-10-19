@@ -8,7 +8,7 @@ const OPENDAW_BASE = import.meta.env.VITE_OPENDAW_URL || 'https://resonance-daw.
 const OPENDAW_ORIGIN = new URL(OPENDAW_BASE).origin;
 const seed = [{id:'#42',title:'Bring the bassline forward in verse 2',author:'Mika Ito',status:'Ready for review',branch:'proposal/42-bassline',baseSha:'45e9f2a7',headSha:'d4c91a'}];
 let lastProposal; let lastProjectSnapshot; let dawWindow;
-export const songManifest = {id:'night-transit',projectPath:'project/main.od',baseSha:'45e9f2a79ff4f8cc28d7ad2c4ddbe5946adaaf82',engineCommit:'b9e8190b8b1a9da3fcac2d7ebf4c0fe9a821fe5b',rendererVersion:'renderer-local-0.1.0'};
+export const songManifest = {id:'night-transit',projectPath:'project/main.od',baseSha:'af11c3460d2c41c2f20a0f9bb18f98678f5073b2',engineCommit:'b9e8190b8b1a9da3fcac2d7ebf4c0fe9a821fe5b',rendererVersion:'renderer-local-0.1.0'};
 export function listProposals(){try{return JSON.parse(localStorage.getItem(KEY))||seed}catch{return seed}}
 export async function listProposalsFromApi(){const r=await fetch(`${API_BASE}/api/songs/night-transit/proposals`);if(!r.ok)throw new Error('proposal list failed');return r.json()}
 export async function listFiles(){const r=await fetch(`${API_BASE}/api/songs/night-transit/files`);if(!r.ok)throw new Error('file list failed');return r.json()}
