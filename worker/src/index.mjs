@@ -37,6 +37,27 @@ async function storeProposal(env, proposal) {
     .bind(proposal.id, manifest.id, JSON.stringify(proposal), Date.now()).run();
 }
 
+function previewWav(mode) {
+  const sampleRate = 22050;
+  const seconds = 2;
+  const samples = sampleRate * seconds;
+  const data = new Uint8Array(44 + samples * 2);
+  const view = new DataView(data.buffer);
+  const put = (offset, value) => [...value].forEach((byte, index) => view.setUint8(offset + index, byte.charCodeAt(0)));
+  put(0, 'RIFF'); view.setUint32(4, 36 + samples * 2, true); put(8, 'WAVE'); put(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true); put(36, 'data'); view.setUint32(40, samples * 2, true);
+  const root = mode === 'proposal' ? 220 : 196;
+  for (let i = 0; i < samples; i += 1) {
+    const t = i / sampleRate;
+    const envelope = Math.min(1, t * 16) * Math.min(1, (seconds - t) * 16);
+    const tone = Math.sin(2 * Math.PI * root * t) * 0.18 + Math.sin(2 * Math.PI * root * 1.5 * t) * (mode === 'proposal' ? 0.1 : 0.04);
+    view.setInt16(44 + i * 2, tone * envelope * 32767, true);
+  }
+  return data;
+}
+
 async function githubRequest(env, path, options = {}) {
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) throw new Error('GitHub integration is not configured');
   const response = await fetch(`https://api.github.com${path}`, {
@@ -62,6 +83,8 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,authorization' } });
+    if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
+    if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL ? 'tailscale-pi' : 'unconfigured' });
     if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean(env.GITHUB_APP_ID && env.GITHUB_PRIVATE_KEY && env.GITHUB_INSTALLATION_ID), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
@@ -112,7 +135,7 @@ export default {
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${proposalRender[1]}`);
       if (!proposal || proposal.baseSha !== manifest.baseSha) return json({ error: 'proposal base SHA is not renderable' }, 409);
-      if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: manifest.rendererVersion, baseUrl: '/audio/night-transit-base.wav', proposalUrl: '/audio/night-transit-proposal.wav' }, 202);
+      if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', previewOnly: true, baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: 'worker-preview-synth-0.1.0', baseUrl: `${url.origin}/audio/night-transit-base.wav`, proposalUrl: `${url.origin}/audio/night-transit-proposal.wav` }, 202);
     }
     const renderStatus = url.pathname.match(/^\/api\/(?:render|renders)\/([^/]+)$/);
     if (renderStatus && request.method === 'GET') return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
