@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Play, Pause, GitPullRequest, GitBranch, Headphones, Search, Bell, Settings2, ArrowUpRight, ChevronRight, CircleDot, Layers3, Sparkles, Github, Music2, CheckCircle2, Clock3, SlidersHorizontal, MoreHorizontal, GitMerge, X, Volume2} from 'lucide-react';
 import './styles.css';
-import {createProposalFromApi, createPullRequest, getConfig, getRender, listFiles, listProposals, listProposalsFromApi, openProject, requestProjectSnapshot, requestRender, songManifest} from './platformApi';
+import {createProposalFromApi, createPullRequest, getConfig, getRender, listCommits, listFiles, listProposals, listProposalsFromApi, openProject, requestProjectSnapshot, requestRender, songManifest} from './platformApi';
 
 const proposals=[
  {id:'#42', title:'Bring the bassline forward in verse 2', author:'Mika Ito', avatar:'MI', branch:'proposal/42-bassline', time:'2h ago', status:'Ready for review', color:'#a8e6cf', votes:18, comments:6, duration:'03:42'},
