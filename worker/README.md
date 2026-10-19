@@ -18,6 +18,11 @@ short-lived GitHub App installation token as `GITHUB_APP_TOKEN` (preferred),
 or use `GITHUB_TOKEN` for a server-side fallback, as encrypted Worker secrets;
 never put them in `wrangler.toml` or Vite variables.
 
+For automatic installation-token refresh, set `GITHUB_APP_ID` and
+`GITHUB_INSTALLATION_ID` as variables or secrets and store the PEM private key
+as the encrypted `GITHUB_APP_PRIVATE_KEY` secret instead of using
+`GITHUB_APP_TOKEN`.
+
 ## Durable proposal storage
 
 The Worker uses an optional D1 binding named `DB`. Without it, proposals are

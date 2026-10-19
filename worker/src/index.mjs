@@ -26,6 +26,36 @@ const proposals = [{ id: '#42', title: 'Bring the bassline forward in verse 2', 
 const renderJobs = new Map();
 const MAX_PROPOSAL_BODY_BYTES = 3_000_000;
 const MAX_SNAPSHOT_BASE64_BYTES = 2_500_000;
+let githubInstallationTokenCache;
+
+function base64url(value) {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : new Uint8Array(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function pemToBytes(pem) {
+  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function githubToken(env) {
+  if (env.GITHUB_APP_TOKEN) return env.GITHUB_APP_TOKEN;
+  if (!env.GITHUB_APP_ID || !env.GITHUB_INSTALLATION_ID || !env.GITHUB_APP_PRIVATE_KEY) return env.GITHUB_TOKEN || null;
+  if (githubInstallationTokenCache && githubInstallationTokenCache.expiresAt > Date.now() + 60_000) return githubInstallationTokenCache.token;
+  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64url(JSON.stringify({ iat: Math.floor(Date.now() / 1000) - 60, exp: Math.floor(Date.now() / 1000) + 540, iss: env.GITHUB_APP_ID }));
+  const signingInput = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey('pkcs8', pemToBytes(env.GITHUB_APP_PRIVATE_KEY), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput));
+  const response = await fetch(`https://api.github.com/app/installations/${encodeURIComponent(env.GITHUB_INSTALLATION_ID)}/access_tokens`, { method: 'POST', headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${signingInput}.${base64url(signature)}`, 'x-github-api-version': '2022-11-28', 'user-agent': 'resonance-api' } });
+  if (!response.ok) throw new Error(`GitHub App token ${response.status}`);
+  const data = await response.json();
+  githubInstallationTokenCache = { token: data.token, expiresAt: Date.parse(data.expires_at) || Date.now() + 3_000_000 };
+  return data.token;
+}
 
 async function readJsonBody(request) {
   const length = Number(request.headers.get('content-length') || 0);
@@ -69,7 +99,7 @@ function previewWav(mode) {
 }
 
 async function githubRequest(env, path, options = {}) {
-  const token = env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN;
+  const token = await githubToken(env);
   if (!token || !env.GITHUB_REPOSITORY) throw new Error('GitHub integration is not configured');
   const response = await fetch(`https://api.github.com${path}`, {
     ...options,
@@ -109,7 +139,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL ? 'tailscale-pi' : 'unconfigured' });
-    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN) && env.GITHUB_REPOSITORY), githubAuthMode: env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured'), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || (env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY)) && env.GITHUB_REPOSITORY), githubAuthMode: env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (env.GITHUB_APP_ID ? 'github-app-private-key' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured')), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
     if (request.method === 'POST' && url.pathname === '/api/webhooks/github') {
       const body = await request.text();
       if (!await verifyWebhookSignature(env.GITHUB_WEBHOOK_SECRET, body, request.headers.get('x-hub-signature-256'))) return json({ error: 'invalid webhook signature' }, 401);
@@ -150,7 +180,7 @@ export default {
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
       if (!proposal) return json({ error: 'proposal not found' }, 404);
-      if (!(env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN) || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
+      if (!(env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || (env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY)) || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
       if (!proposal.projectSnapshot?.contentBase64) return json({ error: 'openDAW project snapshot is required before creating a pull request' }, 422);
       try {
         const [owner, repo] = env.GITHUB_REPOSITORY.split('/');
