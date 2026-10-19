@@ -90,6 +90,18 @@ async function signJob(secret, body) {
   return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function verifyWebhookSignature(secret, body, signature) {
+  if (!secret || !signature?.startsWith('sha256=')) return false;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
+  const expected = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const actual = signature.slice(7);
+  if (actual.length !== expected.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) difference |= expected.charCodeAt(index) ^ actual.charCodeAt(index);
+  return difference === 0;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -98,6 +110,17 @@ export default {
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL ? 'tailscale-pi' : 'unconfigured' });
     if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN) && env.GITHUB_REPOSITORY), githubAuthMode: env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured'), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+    if (request.method === 'POST' && url.pathname === '/api/webhooks/github') {
+      const body = await request.text();
+      if (!await verifyWebhookSignature(env.GITHUB_WEBHOOK_SECRET, body, request.headers.get('x-hub-signature-256'))) return json({ error: 'invalid webhook signature' }, 401);
+      const delivery = request.headers.get('x-github-delivery');
+      if (!delivery) return json({ error: 'missing GitHub delivery id' }, 400);
+      if (env.DB) {
+        try { await env.DB.prepare('INSERT INTO webhook_events (delivery_id, event_name, received_at) VALUES (?1, ?2, ?3)').bind(delivery, request.headers.get('x-github-event') || 'unknown', Date.now()).run(); }
+        catch (error) { if (String(error?.message || error).toLowerCase().includes('unique')) return json({ accepted: true, duplicate: true }); throw error; }
+      }
+      return json({ accepted: true, duplicate: false });
+    }
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits);
