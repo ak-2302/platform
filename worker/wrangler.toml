@@ -5,3 +5,8 @@ compatibility_date = "2026-10-19"
 [vars]
 # Set these as encrypted secrets in production, not in this file.
 PI_RENDERER_URL = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "resonance-proposals"
+database_id = "62ab2692-c179-4e64-90eb-009c2f1fdfee"
