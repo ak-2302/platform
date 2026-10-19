@@ -1,0 +1,7 @@
+name = "resonance-api"
+main = "src/index.mjs"
+compatibility_date = "2026-10-20"
+
+[vars]
+# Set these as encrypted secrets in production, not in this file.
+PI_RENDERER_URL = ""

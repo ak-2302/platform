@@ -3,7 +3,22 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
-  "dependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "react": "latest", "react-dom": "latest", "lucide-react": "latest" },
-  "devDependencies": {}
+  "scripts": {
+    "dev": "vite",
+    "api": "node server/index.mjs",
+    "pi-renderer": "node pi-renderer/server.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "npm run test && npm run build",
+    "test": "node --test server/*.test.mjs"
+  },
+  "dependencies": {
+    "@octokit/app": "16.0.1",
+    "@octokit/rest": "21.1.1",
+    "@vitejs/plugin-react": "4.7.0",
+    "lucide-react": "0.468.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "vite": "6.4.4"
+  }
 }

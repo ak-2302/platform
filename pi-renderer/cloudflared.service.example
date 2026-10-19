@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare Tunnel for re:sonance renderer
+After=network-online.target resonance-renderer.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared tunnel --config /etc/cloudflared/config.yml run
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
