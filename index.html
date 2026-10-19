@@ -8,6 +8,20 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.addEventListener('error', event => {
+        const root = document.getElementById('root');
+        if (root && !root.hasChildNodes()) {
+          root.innerHTML = '<main style="padding:32px;font:16px system-ui;color:#342f2b"><h1>re:sonance</h1><p>起動に失敗しました。ページを再読み込みしてください。</p><pre style="white-space:pre-wrap;color:#8a3b2f">' + String(event.error?.stack || event.message || 'Unknown startup error') + '</pre></main>';
+        }
+      });
+      window.addEventListener('unhandledrejection', event => {
+        const root = document.getElementById('root');
+        if (root && !root.hasChildNodes()) {
+          root.innerHTML = '<main style="padding:32px;font:16px system-ui;color:#342f2b"><h1>re:sonance</h1><p>起動に失敗しました。ページを再読み込みしてください。</p><pre style="white-space:pre-wrap;color:#8a3b2f">' + String(event.reason?.stack || event.reason || 'Unknown startup rejection') + '</pre></main>';
+        }
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
