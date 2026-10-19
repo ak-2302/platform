@@ -86,7 +86,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL ? 'tailscale-pi' : 'unconfigured' });
-    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean(env.GITHUB_APP_ID && env.GITHUB_PRIVATE_KEY && env.GITHUB_INSTALLATION_ID), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPOSITORY), engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits);

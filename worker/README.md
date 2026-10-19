@@ -12,6 +12,10 @@ npm run deploy
 
 `PI_RENDERER_URL` must be the Named Tunnel hostname for the Pi renderer. Do not use the temporary `trycloudflare.com` URL in production. The Worker sends a HMAC signature with every render job; the Pi rejects unsigned or incorrectly pinned jobs.
 
+`GITHUB_REPOSITORY` is the public, non-secret repository target. Keep
+`GITHUB_TOKEN` (or the GitHub App credentials) as encrypted Worker secrets;
+never put them in `wrangler.toml` or Vite variables.
+
 ## Durable proposal storage
 
 The Worker uses an optional D1 binding named `DB`. Without it, proposals are
