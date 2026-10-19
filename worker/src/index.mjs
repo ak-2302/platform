@@ -109,16 +109,19 @@ export default {
       const proposal = current.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
       if (!proposal) return json({ error: 'proposal not found' }, 404);
       if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
+      if (!proposal.projectSnapshot?.contentBase64) return json({ error: 'openDAW project snapshot is required before creating a pull request' }, 422);
       try {
         const [owner, repo] = env.GITHUB_REPOSITORY.split('/');
         if (!owner || !repo) return json({ error: 'GITHUB_REPOSITORY must be owner/repository' }, 500);
         const base = await githubRequest(env, `/repos/${owner}/${repo}/git/ref/heads/main`);
         if (base.object.sha !== manifest.baseSha) return json({ error: 'GitHub main changed after proposal snapshot', baseSha: base.object.sha }, 409);
         await githubRequest(env, `/repos/${owner}/${repo}/git/refs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ref: `refs/heads/${proposal.branch}`, sha: proposal.baseSha }) });
+        const existing = await githubRequest(env, `/repos/${owner}/${repo}/contents/${manifest.projectPath}?ref=${encodeURIComponent(proposal.branch)}`);
+        await githubRequest(env, `/repos/${owner}/${repo}/contents/${manifest.projectPath}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: `${proposal.id} update openDAW project`, content: proposal.projectSnapshot.contentBase64, branch: proposal.branch, sha: existing.sha }) });
         const pr = await githubRequest(env, `/repos/${owner}/${repo}/pulls`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: `${proposal.id} ${proposal.title}`, head: proposal.branch, base: 'main', body: proposal.description || 'Created by re:sonance.' }) });
         proposal.status = 'Ready for review';
         proposal.pullRequest = { number: pr.number, url: pr.html_url };
-        return json({ mode: 'github', number: pr.number, url: pr.html_url, branch: proposal.branch, baseSha: proposal.baseSha, headSha: proposal.headSha }, 201);
+        return json({ mode: 'github', number: pr.number, url: pr.html_url, branch: proposal.branch, baseSha: proposal.baseSha, headSha: pr.head.sha }, 201);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : 'GitHub request failed' }, 502);
       }
