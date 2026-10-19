@@ -24,6 +24,16 @@ const commits = [
 ];
 const proposals = [{ id: '#42', title: 'Bring the bassline forward in verse 2', author: 'Mika Ito', status: 'Ready for review', branch: 'proposal/42-bassline', baseSha: manifest.baseSha, headSha: 'd4c91a', render: 'ready' }];
 const renderJobs = new Map();
+const MAX_PROPOSAL_BODY_BYTES = 3_000_000;
+const MAX_SNAPSHOT_BASE64_BYTES = 2_500_000;
+
+async function readJsonBody(request) {
+  const length = Number(request.headers.get('content-length') || 0);
+  if (length > MAX_PROPOSAL_BODY_BYTES) throw new Error('proposal payload is too large');
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_PROPOSAL_BODY_BYTES) throw new Error('proposal payload is too large');
+  return JSON.parse(text || '{}');
+}
 
 async function loadProposals(env) {
   if (!env.DB) return proposals;
@@ -92,8 +102,12 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(await loadProposals(env));
     if (request.method === 'POST' && url.pathname === '/api/songs/night-transit/proposals') {
-      const input = await request.json().catch(() => ({}));
+      const input = await readJsonBody(request).catch((error) => ({ _error: error.message }));
+      if (input._error) return json({ error: input._error }, 413);
       if (!input.title?.trim()) return json({ error: 'title is required' }, 400);
+      if (input.title.trim().length > 120) return json({ error: 'title is too long' }, 400);
+      if (String(input.description || '').length > 5000) return json({ error: 'description is too long' }, 400);
+      if (input.projectSnapshot?.snapshot?.contentBase64?.length > MAX_SNAPSHOT_BASE64_BYTES || input.projectSnapshot?.contentBase64?.length > MAX_SNAPSHOT_BASE64_BYTES) return json({ error: 'openDAW project snapshot is too large' }, 413);
       const current = await loadProposals(env);
       const number = 43 + current.length;
       const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'change';
@@ -104,7 +118,7 @@ export default {
     }
     const pullRequest = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/pull-request$/);
     if (pullRequest && request.method === 'POST') {
-      const input = await request.json().catch(() => ({}));
+      const input = await readJsonBody(request).catch(() => ({}));
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
       if (!proposal) return json({ error: 'proposal not found' }, 404);
