@@ -8,6 +8,7 @@
     "api": "node server/index.mjs",
     "pi-renderer": "node pi-renderer/server.mjs",
     "build": "vite build",
+    "deploy:pages": "npm run build && node worker/node_modules/wrangler/bin/wrangler.js pages deploy dist --project-name resonance",
     "preview": "vite preview",
     "check": "npm run test && npm run build",
     "test": "node --test server/*.test.mjs"
