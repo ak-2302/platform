@@ -6,8 +6,8 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 const manifest = {
   id: 'night-transit',
   title: 'Night Transit',
-  baseSha: '25af248f',
-  engineCommit: '25af248f6df66b321f921b54930f94fe5c09898f',
+  baseSha: '3940d1a739445f710d982147da9052072352a658',
+  engineCommit: 'd50ab86791de804aa677ec2b920609f50c5a9178',
   projectPath: 'project/main.od',
   rendererVersion: 'renderer-local-0.1.0',
 };

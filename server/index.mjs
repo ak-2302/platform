@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createProposalPullRequest, githubConfigured, verifyWebhookSignature } from './github.mjs';
 
 const port = Number(process.env.PORT || 8787);
-const manifest = { id: 'night-transit', title: 'Night Transit', baseSha: '25af248f', engineRepository: 'music-collab/opendaw', engineCommit: '25af248f6df66b321f921b54930f94fe5c09898f', projectPath: 'project/main.od', rendererVersion: 'renderer-local-0.1.0' };
+const manifest = { id: 'night-transit', title: 'Night Transit', baseSha: '3940d1a739445f710d982147da9052072352a658', engineRepository: 'ak-2302/opendaw', engineCommit: 'd50ab86791de804aa677ec2b920609f50c5a9178', projectPath: 'project/main.od', rendererVersion: 'renderer-local-0.1.0' };
 const songManifestFile = join(process.cwd(), '..', 'song-demo', 'song.json');
 // The song repository is normally checked out beside platform. CI only
 // validates the platform contract, so use the pinned manifest metadata when
