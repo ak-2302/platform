@@ -25,6 +25,18 @@ const commits = [
 const proposals = [{ id: '#42', title: 'Bring the bassline forward in verse 2', author: 'Mika Ito', status: 'Ready for review', branch: 'proposal/42-bassline', baseSha: manifest.baseSha, headSha: 'd4c91a', render: 'ready' }];
 const renderJobs = new Map();
 
+async function loadProposals(env) {
+  if (!env.DB) return proposals;
+  const result = await env.DB.prepare('SELECT payload FROM proposals WHERE song_id = ?1 ORDER BY created_at DESC').bind(manifest.id).all();
+  return result.results.map((row) => JSON.parse(row.payload));
+}
+
+async function storeProposal(env, proposal) {
+  if (!env.DB) return;
+  await env.DB.prepare('INSERT OR REPLACE INTO proposals (id, song_id, payload, created_at) VALUES (?1, ?2, ?3, ?4)')
+    .bind(proposal.id, manifest.id, JSON.stringify(proposal), Date.now()).run();
+}
+
 async function githubRequest(env, path, options = {}) {
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) throw new Error('GitHub integration is not configured');
   const response = await fetch(`https://api.github.com${path}`, {
@@ -55,20 +67,23 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files);
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits);
-    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(proposals);
+    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(await loadProposals(env));
     if (request.method === 'POST' && url.pathname === '/api/songs/night-transit/proposals') {
       const input = await request.json().catch(() => ({}));
       if (!input.title?.trim()) return json({ error: 'title is required' }, 400);
-      const number = 43 + proposals.length;
+      const current = await loadProposals(env);
+      const number = 43 + current.length;
       const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'change';
       const proposal = { id: `#${number}`, title: input.title.trim(), description: input.description || '', author: 'you', status: 'Draft', branch: `proposal/${number}-${slug}`, baseSha: manifest.baseSha, headSha: `worker-${Date.now().toString(16)}`, render: 'queued' };
       proposals.unshift(proposal);
+      await storeProposal(env, proposal);
       return json(proposal, 201);
     }
     const pullRequest = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/pull-request$/);
     if (pullRequest && request.method === 'POST') {
       const input = await request.json().catch(() => ({}));
-      const proposal = proposals.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
+      const current = await loadProposals(env);
+      const proposal = current.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
       if (!proposal) return json({ error: 'proposal not found' }, 404);
       if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
       try {
@@ -94,7 +109,8 @@ export default {
     }
     const proposalRender = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/render$/);
     if (proposalRender && request.method === 'POST') {
-      const proposal = proposals.find((item) => item.id === `#${proposalRender[1]}`);
+      const current = await loadProposals(env);
+      const proposal = current.find((item) => item.id === `#${proposalRender[1]}`);
       if (!proposal || proposal.baseSha !== manifest.baseSha) return json({ error: 'proposal base SHA is not renderable' }, 409);
       if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: manifest.rendererVersion, baseUrl: '/audio/night-transit-base.wav', proposalUrl: '/audio/night-transit-proposal.wav' }, 202);
     }
