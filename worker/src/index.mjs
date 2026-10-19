@@ -25,6 +25,21 @@ const commits = [
 const proposals = [{ id: '#42', title: 'Bring the bassline forward in verse 2', author: 'Mika Ito', status: 'Ready for review', branch: 'proposal/42-bassline', baseSha: manifest.baseSha, headSha: 'd4c91a', render: 'ready' }];
 const renderJobs = new Map();
 
+async function githubRequest(env, path, options = {}) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) throw new Error('GitHub integration is not configured');
+  const response = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      'x-github-api-version': '2022-11-28',
+      ...options.headers,
+    },
+  });
+  if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+  return response.json();
+}
+
 async function signJob(secret, body) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
@@ -49,6 +64,25 @@ export default {
       const proposal = { id: `#${number}`, title: input.title.trim(), description: input.description || '', author: 'you', status: 'Draft', branch: `proposal/${number}-${slug}`, baseSha: manifest.baseSha, headSha: `worker-${Date.now().toString(16)}`, render: 'queued' };
       proposals.unshift(proposal);
       return json(proposal, 201);
+    }
+    const pullRequest = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/pull-request$/);
+    if (pullRequest && request.method === 'POST') {
+      const proposal = proposals.find((item) => item.id === `#${pullRequest[1]}`);
+      if (!proposal) return json({ error: 'proposal not found' }, 404);
+      if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return json({ error: 'GitHub integration is not configured' }, 503);
+      try {
+        const [owner, repo] = env.GITHUB_REPOSITORY.split('/');
+        if (!owner || !repo) return json({ error: 'GITHUB_REPOSITORY must be owner/repository' }, 500);
+        const base = await githubRequest(env, `/repos/${owner}/${repo}/git/ref/heads/main`);
+        if (base.object.sha !== manifest.baseSha) return json({ error: 'GitHub main changed after proposal snapshot', baseSha: base.object.sha }, 409);
+        await githubRequest(env, `/repos/${owner}/${repo}/git/refs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ref: `refs/heads/${proposal.branch}`, sha: proposal.baseSha }) });
+        const pr = await githubRequest(env, `/repos/${owner}/${repo}/pulls`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: `${proposal.id} ${proposal.title}`, head: proposal.branch, base: 'main', body: proposal.description || 'Created by re:sonance.' }) });
+        proposal.status = 'Ready for review';
+        proposal.pullRequest = { number: pr.number, url: pr.html_url };
+        return json({ mode: 'github', number: pr.number, url: pr.html_url, branch: proposal.branch, baseSha: proposal.baseSha, headSha: proposal.headSha }, 201);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : 'GitHub request failed' }, 502);
+      }
     }
     if (url.pathname === '/api/render' && request.method === 'POST') {
       if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ error: 'Pi renderer is not configured' }, 503);
