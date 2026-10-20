@@ -17,9 +17,22 @@ const entries = fields.split('\x1e').map((record) => record.trim()).filter(Boole
     url: `https://github.com/ak-2302/song-demo/commit/${oid}` };
 });
 const bySha = new Map(entries.map((commit) => [commit.oid, commit]));
+const head = branches[0].target;
+const mainReachable = new Set();
+const mainStack = [head];
+while (mainStack.length) {
+  const oid = mainStack.pop();
+  if (mainReachable.has(oid)) continue;
+  mainReachable.add(oid);
+  mainStack.push(...(bySha.get(oid)?.parents || []));
+}
+const originRefs = branches.slice(1).map((branch) => {
+  const tip = bySha.get(branch.target);
+  const origin = tip?.parents.find((parent) => mainReachable.has(parent));
+  return origin ? { name: `refs/tags/branch-origin/${branch.name.slice('refs/heads/'.length)} ← main`, target: origin, kind: 'tag' } : null;
+}).filter(Boolean);
 const children = new Map(entries.map((commit) => [commit.oid, 0]));
 for (const commit of entries) for (const parent of commit.parents) if (children.has(parent)) children.set(parent, children.get(parent) + 1);
-const head = branches[0].target;
 const ready = entries.filter((commit) => children.get(commit.oid) === 0);
 const commits = [];
 const emitted = new Set();
@@ -37,5 +50,5 @@ while (ready.length) {
 if (commits.length !== entries.length) throw new Error(`Incomplete song-demo history: ${commits.length}/${entries.length}`);
 const output = resolve('public/git-graph.json');
 mkdirSync(resolve('public'), { recursive: true });
-writeFileSync(output, JSON.stringify({ commits, refs: branches, head, hasMore: false, repositoryId: 'ak-2302/song-demo', repositoryName: 'ak-2302/song-demo' }));
+writeFileSync(output, JSON.stringify({ commits, refs: [...branches, ...originRefs], head, hasMore: false, repositoryId: 'ak-2302/song-demo', repositoryName: 'ak-2302/song-demo' }));
 console.log(`Generated ${commits.length} commits from ${branches.length} branches: ${output}`);
