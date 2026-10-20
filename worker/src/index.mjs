@@ -154,6 +154,20 @@ async function githubRequest(env, path, options = {}) {
   return response.json();
 }
 
+async function dispatchGithubRender(env, proposal) {
+  const [owner, repo] = String(env.GITHUB_REPOSITORY || '').split('/');
+  if (!owner || !repo || !env.GITHUB_RENDER_WORKFLOW) throw new Error('GitHub Actions renderer is not configured');
+  await githubRequest(env, `/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(env.GITHUB_RENDER_WORKFLOW)}/dispatches`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      ref: env.GITHUB_RENDER_REF || 'main',
+      inputs: { base_sha: proposal.baseSha, head_sha: proposal.headSha, engine_commit: manifest.engineCommit },
+    }),
+  });
+  return { jobId: `actions-${Date.now()}-${proposal.id.slice(1)}`, proposalId: proposal.id, status: 'queued', rendererVersion: 'github-actions-preview-0.1.0', baseSha: proposal.baseSha, headSha: proposal.headSha, previewOnly: true, delivery: 'github-actions' };
+}
+
 async function signJob(secret, body) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
@@ -208,7 +222,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,authorization' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
-    if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview' }, 200, 'public, max-age=30, s-maxage=30');
+    if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions' : (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview') }, 200, 'public, max-age=30, s-maxage=30');
     if (request.method === 'GET' && url.pathname === '/api/config') {
       const appReady = Boolean(env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY);
       const githubConfigured = Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || appReady) && env.GITHUB_REPOSITORY);
@@ -217,7 +231,7 @@ export default {
       const githubSetup = { repositoryConfigured: Boolean(env.GITHUB_REPOSITORY), appIdConfigured: Boolean(env.GITHUB_APP_ID), installationIdConfigured: Boolean(env.GITHUB_INSTALLATION_ID), privateKeyConfigured: Boolean(env.GITHUB_APP_PRIVATE_KEY), webhookSecretConfigured: Boolean(env.GITHUB_WEBHOOK_SECRET) };
       const nextAction = !githubSetup.repositoryConfigured ? 'configure-repository' : (!githubSetup.privateKeyConfigured && !env.GITHUB_APP_TOKEN && !env.GITHUB_TOKEN ? 'register-github-app-private-key' : null);
       const authNextAction = authConfigured ? null : 'configure-github-oauth-secrets';
-      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, authConfigured, authNextAction, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
+      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, authConfigured, authNextAction, renderer: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions' : (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview'), engineCommit: manifest.engineCommit, rendererVersion: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions-preview-0.1.0' : manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
     }
     if (request.method === 'GET' && url.pathname === '/api/auth/github') {
       if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.GITHUB_OAUTH_REDIRECT_URI || !env.AUTH_SESSION_SECRET) return authSetupResponse();
@@ -344,6 +358,15 @@ export default {
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${proposalRender[1]}`);
       if (!proposal || proposal.baseSha !== manifest.baseSha) return json({ error: 'proposal base SHA is not renderable' }, 409);
+      if (env.GITHUB_ACTIONS_RENDERING === 'true') {
+        try {
+          const job = await dispatchGithubRender(env, proposal);
+          renderJobs.set(job.jobId, job); await storeRenderJob(env, job);
+          return json(job, 202);
+        } catch (error) {
+          return json({ error: 'GitHub Actions renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
+        }
+      }
       if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
         const body = JSON.stringify({ songId: manifest.id, proposalId: proposal.id, projectPath: manifest.projectPath, engineCommit: manifest.engineCommit, baseSha: proposal.baseSha, headSha: proposal.headSha, rendererVersion: manifest.rendererVersion });
         const signature = await signJob(env.PI_RENDERER_SECRET, body);

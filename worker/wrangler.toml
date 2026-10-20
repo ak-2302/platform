@@ -9,6 +9,9 @@ GITHUB_REPOSITORY = "ak-2302/song-demo"
 GITHUB_OAUTH_CLIENT_ID = "Iv23liCjnejrtLF5AFCQ"
 GITHUB_OAUTH_REDIRECT_URI = "https://resonance-api.meiteya.workers.dev/api/auth/github/callback"
 GITHUB_AUTH_SUCCESS_REDIRECT = "https://resonance.xn--n8jl2g.xn--q9jyb4c/"
+GITHUB_ACTIONS_RENDERING = "true"
+GITHUB_RENDER_WORKFLOW = "trusted-render.yml"
+GITHUB_RENDER_REF = "main"
 
 [[d1_databases]]
 binding = "DB"
