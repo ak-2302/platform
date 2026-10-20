@@ -1,6 +1,13 @@
+const PUBLIC_SITE_ORIGIN = 'https://resonance.xn--n8jl2g.xn--q9jyb4c';
+const corsHeaders = {
+  'access-control-allow-origin': PUBLIC_SITE_ORIGIN,
+  'access-control-allow-credentials': 'true',
+  'access-control-allow-methods': 'GET,POST,OPTIONS',
+  'access-control-allow-headers': 'content-type,authorization',
+};
 const json = (body, status = 200, cacheControl = 'no-store') => new Response(JSON.stringify(body), {
   status,
-  headers: { 'content-type': 'application/json', 'cache-control': cacheControl, 'access-control-allow-origin': '*' },
+  headers: { 'content-type': 'application/json', 'cache-control': cacheControl, ...corsHeaders },
 });
 
 const manifest = {
@@ -219,9 +226,9 @@ async function verifyWebhookSignature(secret, body, signature) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,authorization' } });
-    if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
-    if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+    if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', ...corsHeaders } });
+    if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', ...corsHeaders } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions' : (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview') }, 200, 'public, max-age=30, s-maxage=30');
     if (request.method === 'GET' && url.pathname === '/api/config') {
       const appReady = Boolean(env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY);
@@ -264,7 +271,7 @@ export default {
       const user = await sessionUser(request, env);
       return user ? json({ authenticated: true, user }, 200, 'private, max-age=30') : json({ authenticated: false }, 401, 'no-store');
     }
-    if (request.method === 'POST' && url.pathname === '/api/auth/logout') return new Response(null, { status: 204, headers: { 'set-cookie': 'resonance_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax', 'access-control-allow-origin': '*' } });
+    if (request.method === 'POST' && url.pathname === '/api/auth/logout') return new Response(null, { status: 204, headers: { 'set-cookie': 'resonance_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax', ...corsHeaders } });
     if (request.method === 'POST' && url.pathname === '/api/webhooks/github') {
       const body = await request.text();
       if (!await verifyWebhookSignature(env.GITHUB_WEBHOOK_SECRET, body, request.headers.get('x-hub-signature-256'))) return json({ error: 'invalid webhook signature' }, 401);
@@ -348,7 +355,7 @@ export default {
       const signature = await signJob(env.PI_RENDERER_SECRET, body);
       try {
         const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
-        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', ...corsHeaders } });
       } catch (error) {
         return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
       }
@@ -373,7 +380,7 @@ export default {
         try {
           const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
           if (upstream.ok) { const job = await upstream.clone().json().catch(() => null); if (job) await storeRenderJob(env, job); }
-          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', ...corsHeaders } });
         } catch (error) {
           return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
         }
@@ -391,7 +398,7 @@ export default {
         try {
           const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}${path}`, { headers: { 'x-resonance-signature': `sha256=${signature}` } });
           if (upstream.ok) { const job = await upstream.clone().json().catch(() => null); if (job) await storeRenderJob(env, job); }
-          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', ...corsHeaders } });
         } catch (error) {
           return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
         }
