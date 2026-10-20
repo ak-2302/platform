@@ -23,7 +23,16 @@ const server = createServer(async (req, res) => {
     if (input.engineCommit !== process.env.OPENDAW_COMMIT) return send(res, 409, { error: 'engine commit is not pinned on renderer' });
     if (process.env.BASE_SHA && input.baseSha !== process.env.BASE_SHA) return send(res, 409, { error: 'base SHA is not pinned on renderer' });
     if (typeof input.headSha !== 'string' || !/^[0-9a-f]{7,64}$/i.test(input.headSha)) return send(res, 400, { error: 'head SHA is required' });
-    const jobId = randomUUID(); jobs.set(jobId, { jobId, status: 'queued', rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0' });
+    const jobId = randomUUID(); jobs.set(jobId, {
+      jobId,
+      proposalId: input.proposalId || null,
+      songId: input.songId || null,
+      baseSha: input.baseSha,
+      headSha: input.headSha,
+      engineCommit: input.engineCommit,
+      status: 'queued',
+      rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0',
+    });
     // The actual fixed openDAW CLI invocation is intentionally isolated here.
     // It must read only the verified base/head SHAs and never execute repository code.
     return send(res, 202, jobs.get(jobId));
