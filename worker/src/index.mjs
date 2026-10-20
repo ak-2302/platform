@@ -98,14 +98,23 @@ async function storeProposal(env, proposal) {
 
 async function storeRenderJob(env, job) {
   if (!env.DB || !job?.jobId) return;
-  await env.DB.prepare('INSERT OR REPLACE INTO render_jobs (job_id, proposal_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4)')
-    .bind(job.jobId, job.proposalId || '', JSON.stringify(job), Date.now()).run();
+  try {
+    await env.DB.prepare('INSERT OR REPLACE INTO render_jobs (job_id, proposal_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4)')
+      .bind(job.jobId, job.proposalId || '', JSON.stringify(job), Date.now()).run();
+  } catch (error) {
+    console.error('render job persistence failed', error);
+  }
 }
 
 async function loadRenderJob(env, jobId) {
   if (!env.DB) return renderJobs.get(jobId) || null;
-  const row = await env.DB.prepare('SELECT payload FROM render_jobs WHERE job_id = ?1').bind(jobId).first();
-  return row ? JSON.parse(row.payload) : (renderJobs.get(jobId) || null);
+  try {
+    const row = await env.DB.prepare('SELECT payload FROM render_jobs WHERE job_id = ?1').bind(jobId).first();
+    return row ? JSON.parse(row.payload) : (renderJobs.get(jobId) || null);
+  } catch (error) {
+    console.error('render job lookup failed', error);
+    return renderJobs.get(jobId) || null;
+  }
 }
 
 function previewWav(mode) {
