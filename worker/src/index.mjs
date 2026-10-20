@@ -224,6 +224,8 @@ export default {
         const pr = await githubRequest(env, `/repos/${owner}/${repo}/pulls`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: `${proposal.id} ${proposal.title}`, head: proposal.branch, base: 'main', body: proposal.description || 'Created by re:sonance.' }) });
         proposal.status = 'Ready for review';
         proposal.pullRequest = { number: pr.number, url: pr.html_url };
+        proposal.headSha = pr.head.sha || proposal.headSha;
+        await storeProposal(env, proposal);
         return json({ mode: 'github', number: pr.number, url: pr.html_url, branch: proposal.branch, baseSha: proposal.baseSha, headSha: pr.head.sha }, 201);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : 'GitHub request failed' }, 502);
