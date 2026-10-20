@@ -31,3 +31,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now resonance-renderer cloudflared
 curl http://127.0.0.1:8790/health
 ```
+
+From the platform repository, create a secret-free transfer bundle with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/package-pi-renderer.ps1
+```
+
+Copy the resulting `dist/resonance-pi-renderer.zip` to the Pi. Secrets stay in `/etc/resonance/pi-renderer.env` and are never included in the bundle.
