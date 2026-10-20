@@ -181,7 +181,9 @@ async function sessionUser(request, env) {
   const signature = value.slice(separator + 1);
   if (signature !== await hmacHex(env.AUTH_SESSION_SECRET, payload)) return null;
   try {
-    const user = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload.replace(/-/g, '+').replace(/_/g, '/')), (char) => char.charCodeAt(0))));
+    const encoded = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=');
+    const user = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (char) => char.charCodeAt(0))));
     return user.exp > Date.now() ? user : null;
   } catch { return null; }
 }
