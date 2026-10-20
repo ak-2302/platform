@@ -18,28 +18,6 @@ const entries = fields.split('\x1e').map((record) => record.trim()).filter(Boole
 });
 const bySha = new Map(entries.map((commit) => [commit.oid, commit]));
 const head = branches[0].target;
-const mainReachable = new Set();
-const mainStack = [head];
-while (mainStack.length) {
-  const oid = mainStack.pop();
-  if (mainReachable.has(oid)) continue;
-  mainReachable.add(oid);
-  mainStack.push(...(bySha.get(oid)?.parents || []));
-}
-const originRefs = branches.slice(1).map((branch) => {
-  const branchStack = [branch.target];
-  const branchSeen = new Set();
-  let origin;
-  while (branchStack.length && !origin) {
-    const oid = branchStack.pop();
-    if (branchSeen.has(oid) || mainReachable.has(oid)) continue;
-    branchSeen.add(oid);
-    const commit = bySha.get(oid);
-    origin = commit?.parents.find((parent) => mainReachable.has(parent));
-    branchStack.push(...(commit?.parents || []));
-  }
-  return origin ? { name: `refs/tags/branch-origin/${branch.name.slice('refs/heads/'.length)} ← main`, target: origin, kind: 'tag' } : null;
-}).filter(Boolean);
 const children = new Map(entries.map((commit) => [commit.oid, 0]));
 for (const commit of entries) for (const parent of commit.parents) if (children.has(parent)) children.set(parent, children.get(parent) + 1);
 const ready = entries.filter((commit) => children.get(commit.oid) === 0);
