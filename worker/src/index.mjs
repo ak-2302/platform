@@ -242,8 +242,12 @@ export default {
       if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ error: 'Pi renderer is not configured' }, 503);
       const body = await request.text();
       const signature = await signJob(env.PI_RENDERER_SECRET, body);
-      const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
-      return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+      try {
+        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
+        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+      } catch (error) {
+        return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
+      }
     }
     const proposalRender = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/render$/);
     if (proposalRender && request.method === 'POST') {
@@ -253,8 +257,12 @@ export default {
       if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
         const body = JSON.stringify({ songId: manifest.id, proposalId: proposal.id, projectPath: manifest.projectPath, engineCommit: manifest.engineCommit, baseSha: proposal.baseSha, headSha: proposal.headSha, rendererVersion: manifest.rendererVersion });
         const signature = await signJob(env.PI_RENDERER_SECRET, body);
-        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
-        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+        try {
+          const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
+          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+        } catch (error) {
+          return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
+        }
       }
       if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', previewOnly: true, baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: 'worker-preview-synth-0.1.0', baseUrl: `${url.origin}/audio/night-transit-base.wav`, proposalUrl: `${url.origin}/audio/night-transit-proposal.wav` }, 202);
     }
@@ -263,8 +271,12 @@ export default {
       if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
         const path = `/jobs/${encodeURIComponent(renderStatus[1])}`;
         const signature = await signJob(env.PI_RENDERER_SECRET, '');
-        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}${path}`, { headers: { 'x-resonance-signature': `sha256=${signature}` } });
-        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+        try {
+          const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}${path}`, { headers: { 'x-resonance-signature': `sha256=${signature}` } });
+          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+        } catch (error) {
+          return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
+        }
       }
       return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
     }
