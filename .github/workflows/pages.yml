@@ -24,6 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: git clone --no-single-branch https://github.com/ak-2302/song-demo.git ../song-demo
+      - run: node scripts/generate-git-graph.mjs
       - run: npm run build
       - uses: actions/configure-pages@v5
         with:
