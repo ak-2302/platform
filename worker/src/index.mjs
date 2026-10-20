@@ -261,12 +261,6 @@ export default {
       }
       return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
     }
-    const jobMatch = url.pathname.match(/^\/api\/render\/([^/]+)$/);
-    if (jobMatch && request.method === 'GET') {
-      if (!env.PI_RENDERER_URL) return json({ error: 'Pi renderer is not configured' }, 503);
-      const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs/${encodeURIComponent(jobMatch[1])}`);
-      return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
-    }
     return json({ error: 'not found' }, 404);
   },
 };
