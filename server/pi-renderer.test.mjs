@@ -37,6 +37,8 @@ test('Pi renderer enforces HMAC and pinned SHAs', async () => {
   const accepted = await fetch(`${base}/jobs`, { method: 'POST', body: payload, headers: { 'x-resonance-signature': signature(payload) } });
   assert.equal(accepted.status, 202);
   const job = await accepted.json();
+  const queued = await fetch(`${base}/jobs`, { method: 'POST', body: payload, headers: { 'x-resonance-signature': signature(payload) } });
+  assert.equal(queued.status, 429);
   assert.equal((await fetch(`${base}/jobs/${job.jobId}`)).status, 401);
   const status = await fetch(`${base}/jobs/${job.jobId}`, { headers: { 'x-resonance-signature': signature('') } });
   assert.equal(status.status, 200);
