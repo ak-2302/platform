@@ -5,7 +5,7 @@ import { API_BASE } from "../platformApi";
 const REPOSITORY = "ak-2302/song-demo";
 const GRAPH_COLUMNS = "commit";
 const GRAPH_STYLE =
-  ".history{grid-template-rows:0 minmax(0,1fr)!important}.header{display:none!important}.row{border-bottom:0!important}.row:hover,.row.preview,.row.context-active,.row.selected{background:transparent!important}.subject .message,.commit-body,.oid{display:none!important}.col-description{display:none!important}.col-commit{font-size:0!important}.subject{padding:0 10px!important}.refs{font-size:10px!important}";
+  ".header{display:none!important}.row{border-bottom:0!important}.row:hover,.row.preview,.row.context-active,.row.selected{background:transparent!important}.subject .message,.commit-body,.oid{display:none!important}.col-description{display:none!important}.col-commit{font-size:0!important}.subject{padding:0 10px!important}.refs{font-size:10px!important}";
 
 async function loadHistory({ signal, refs } = {}) {
   const response = await fetch(
