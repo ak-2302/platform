@@ -37,5 +37,5 @@ while (ready.length) {
 if (commits.length !== entries.length) throw new Error(`Incomplete song-demo history: ${commits.length}/${entries.length}`);
 const output = resolve('public/git-graph.json');
 mkdirSync(resolve('public'), { recursive: true });
-writeFileSync(output, JSON.stringify({ commits, refs: [...branches, ...originRefs], head, hasMore: false, repositoryId: 'ak-2302/song-demo', repositoryName: 'ak-2302/song-demo' }));
+writeFileSync(output, JSON.stringify({ commits, refs: branches, head, hasMore: false, repositoryId: 'ak-2302/song-demo', repositoryName: 'ak-2302/song-demo' }));
 console.log(`Generated ${commits.length} commits from ${branches.length} branches: ${output}`);
