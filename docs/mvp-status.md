@@ -12,8 +12,9 @@
 | GitHub App設定 | 一部完了 | OAuth Client Secret・セッション署名秘密・コールバックURLは設定済み。App秘密鍵をWorker secretへ登録する |
 | GitHubログイン | 完了 | `/api/auth/github`の302、`/api/auth/me`、提案作成時のログイン必須を確認 |
 | GitHub PR作成 | 保留 | GitHub App秘密鍵登録後に本番経路を検証 |
-| Pi固定レンダラー | 保留 | Piへ配布ZIPを配置し、固定rendererを検証後`RENDERER_READY=true`にする |
-| A/B試聴 | Worker preview | Pi未接続中は簡易WAV。Pi接続後に実レンダーへ切り替える |
+| GitHub Actions固定レンダラー | 実装済み・要秘密鍵 | `song-demo/.github/workflows/trusted-render.yml`を追加。GitHub App秘密鍵とActions実行権限が必要 |
+| Pi固定レンダラー | 任意の予備経路 | Piへ配布ZIPを配置した場合のみ利用 |
+| A/B試聴 | Actions移行中 | Workerの簡易WAVからActions生成物へ切り替え。R2等の成果物配信が次の作業 |
 | 本番受け入れテスト | 一部完了 | 公開・API・セキュリティ境界は確認済み。GitHub PRとPi実レンダーが未確認 |
 
 ## 次の順序
