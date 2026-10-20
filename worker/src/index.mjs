@@ -31,6 +31,7 @@ const commits = [
 ];
 let gitLogCache = { expiresAt: 0, value: commits };
 let gitRefsCache = { expiresAt: 0, value: ['refs/heads/main'] };
+let gitGraphCache = { expiresAt: 0, value: null };
 const proposals = [{ id: '#42', title: 'Bring the bassline forward in verse 2', author: 'Mika Ito', status: 'Ready for review', branch: 'proposal/42-bassline', baseSha: manifest.baseSha, headSha: 'd4c91a', render: 'ready' }];
 const renderJobs = new Map();
 const MAX_PROPOSAL_BODY_BYTES = 3_000_000;
@@ -64,6 +65,48 @@ async function loadGitRefs(env) {
   const value = branches.map((branch) => `refs/heads/${branch.name}`);
   gitRefsCache = { expiresAt: Date.now() + 60_000, value: value.length ? value : ['refs/heads/main'] };
   return gitRefsCache.value;
+}
+
+async function loadGitGraph(env) {
+  if (gitGraphCache.value && gitGraphCache.expiresAt > Date.now()) return gitGraphCache.value;
+  const repository = env.GITHUB_REPOSITORY || 'ak-2302/song-demo';
+  const headers = { accept: 'application/vnd.github+json', 'user-agent': 'resonance-api' };
+  async function readPages(path) {
+    const items = [];
+    for (let page = 1; ; page += 1) {
+      const response = await fetch(`https://api.github.com/repos/${repository}/${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${page}`, { headers });
+      if (!response.ok) throw new Error(`GitHub history request failed: ${response.status}`);
+      const batch = await response.json();
+      items.push(...batch);
+      if (batch.length < 100) return items;
+    }
+  }
+  const branches = await readPages('branches');
+  const orderedBranches = branches.sort((a, b) => a.name === 'main' ? -1 : b.name === 'main' ? 1 : a.name.localeCompare(b.name));
+  const histories = await Promise.all(orderedBranches.map((branch) => readPages(`commits?sha=${encodeURIComponent(branch.name)}`)));
+  const bySha = new Map(histories.flat().map((item) => [item.sha, item]));
+  const children = new Map([...bySha.keys()].map((sha) => [sha, 0]));
+  for (const item of bySha.values()) for (const parent of item.parents) if (children.has(parent.sha)) children.set(parent.sha, children.get(parent.sha) + 1);
+  const mainHead = orderedBranches.find((branch) => branch.name === 'main')?.commit.sha;
+  const ready = [bySha.get(mainHead), ...[...bySha.values()].filter((item) => children.get(item.sha) === 0 && item.sha !== mainHead)].filter(Boolean);
+  const emitted = new Set();
+  const commits = [];
+  while (ready.length) {
+    ready.sort((a, b) => a.sha === mainHead ? -1 : b.sha === mainHead ? 1 : Date.parse(b.commit.committer?.date || b.commit.author?.date || 0) - Date.parse(a.commit.committer?.date || a.commit.author?.date || 0));
+    const item = ready.shift();
+    if (emitted.has(item.sha)) continue;
+    emitted.add(item.sha);
+    commits.push({ oid: item.sha, parents: item.parents.map((parent) => parent.sha), message: item.commit.message.split('\n')[0], kind: 'commit', author: { name: item.commit.author?.name || item.author?.login || 'unknown' }, authoredAt: item.commit.author?.date, committedAt: item.commit.committer?.date, url: item.html_url });
+    for (const parent of item.parents) if (children.has(parent.sha)) {
+      const remaining = children.get(parent.sha) - 1;
+      children.set(parent.sha, remaining);
+      if (remaining === 0 && !emitted.has(parent.sha)) ready.push(bySha.get(parent.sha));
+    }
+  }
+  if (commits.length !== bySha.size) throw new Error('Git history contains unresolved parent relationships');
+  const value = { commits, refs: orderedBranches.map((branch) => ({ name: `refs/heads/${branch.name}`, target: branch.commit.sha, kind: 'head' })), head: mainHead, hasMore: false, repositoryId: repository, repositoryName: repository };
+  gitGraphCache = { expiresAt: Date.now() + 300_000, value };
+  return value;
 }
 
 function base64url(value) {
@@ -324,6 +367,10 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files, 200, 'public, max-age=300, s-maxage=300');
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(await loadGitLog(env), 200, 'public, max-age=60, s-maxage=60');
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/refs') return json(await loadGitRefs(env), 200, 'public, max-age=60, s-maxage=60');
+    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/graph') {
+      try { return json(await loadGitGraph(env), 200, 'public, max-age=300, s-maxage=300'); }
+      catch (error) { return json({ error: error instanceof Error ? error.message : 'Git history unavailable' }, 502); }
+    }
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(await loadProposals(env));
     if (request.method === 'POST' && url.pathname === '/api/songs/night-transit/proposals') {
       const authConfigured = Boolean(env.GITHUB_OAUTH_CLIENT_ID && env.GITHUB_OAUTH_CLIENT_SECRET && env.GITHUB_OAUTH_REDIRECT_URI && env.AUTH_SESSION_SECRET);
