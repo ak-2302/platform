@@ -30,6 +30,10 @@ before(async () => {
 after(() => child?.kill());
 
 test('Pi renderer enforces HMAC and pinned SHAs', async () => {
+  const health = await (await fetch(`${base}/health`)).json();
+  assert.equal(health.rendererReady, true);
+  assert.equal(health.maxConcurrentJobs, 1);
+  assert.equal(health.activeJobs, 0);
   const payload = JSON.stringify({ engineCommit, baseSha, headSha: randomBytes(20).toString('hex') });
   assert.equal((await fetch(`${base}/jobs`, { method: 'POST', body: payload })).status, 401);
   assert.equal((await fetch(`${base}/jobs`, { method: 'POST', body: payload, headers: { 'x-resonance-signature': signature('tampered') } })).status, 401);

@@ -17,7 +17,7 @@ function validSignature(body, header) {
 function send(res, status, value) { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)); }
 
 const server = createServer(async (req, res) => {
-  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, service: 'resonance-pi-renderer', rendererReady: process.env.RENDERER_READY === 'true', rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0' });
+  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, service: 'resonance-pi-renderer', rendererReady: process.env.RENDERER_READY === 'true', activeJobs: [...jobs.values()].filter((job) => job.status === 'queued' || job.status === 'running').length, maxConcurrentJobs, rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0' });
   if (req.method === 'POST' && req.url === '/jobs') {
     if (Number(req.headers['content-length'] || 0) > maxJobBodyBytes) return send(res, 413, { error: 'job payload is too large' });
     let body = ''; let bodyBytes = 0;
