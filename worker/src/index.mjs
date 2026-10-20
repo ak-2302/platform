@@ -96,6 +96,18 @@ async function storeProposal(env, proposal) {
     .bind(proposal.id, manifest.id, JSON.stringify(proposal), Date.now()).run();
 }
 
+async function storeRenderJob(env, job) {
+  if (!env.DB || !job?.jobId) return;
+  await env.DB.prepare('INSERT OR REPLACE INTO render_jobs (job_id, proposal_id, payload, updated_at) VALUES (?1, ?2, ?3, ?4)')
+    .bind(job.jobId, job.proposalId || '', JSON.stringify(job), Date.now()).run();
+}
+
+async function loadRenderJob(env, jobId) {
+  if (!env.DB) return renderJobs.get(jobId) || null;
+  const row = await env.DB.prepare('SELECT payload FROM render_jobs WHERE job_id = ?1').bind(jobId).first();
+  return row ? JSON.parse(row.payload) : (renderJobs.get(jobId) || null);
+}
+
 function previewWav(mode) {
   const sampleRate = 22050;
   const seconds = 2;
@@ -259,12 +271,16 @@ export default {
         const signature = await signJob(env.PI_RENDERER_SECRET, body);
         try {
           const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
+          if (upstream.ok) { const job = await upstream.clone().json().catch(() => null); if (job) await storeRenderJob(env, job); }
           return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
         } catch (error) {
           return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
         }
       }
-      if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', previewOnly: true, baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: 'worker-preview-synth-0.1.0', baseUrl: `${url.origin}/audio/night-transit-base.wav`, proposalUrl: `${url.origin}/audio/night-transit-proposal.wav` }, 202);
+      if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) {
+        const job = { jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', previewOnly: true, baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: 'worker-preview-synth-0.1.0', baseUrl: `${url.origin}/audio/night-transit-base.wav`, proposalUrl: `${url.origin}/audio/night-transit-proposal.wav` };
+        renderJobs.set(job.jobId, job); await storeRenderJob(env, job); return json(job, 202);
+      }
     }
     const renderStatus = url.pathname.match(/^\/api\/(?:render|renders)\/([^/]+)$/);
     if (renderStatus && request.method === 'GET') {
@@ -273,12 +289,13 @@ export default {
         const signature = await signJob(env.PI_RENDERER_SECRET, '');
         try {
           const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}${path}`, { headers: { 'x-resonance-signature': `sha256=${signature}` } });
+          if (upstream.ok) { const job = await upstream.clone().json().catch(() => null); if (job) await storeRenderJob(env, job); }
           return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
         } catch (error) {
           return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
         }
       }
-      return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
+      return json(await loadRenderJob(env, renderStatus[1]) || { status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
     }
     return json({ error: 'not found' }, 404);
   },
