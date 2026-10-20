@@ -20,11 +20,11 @@ const bySha = new Map(entries.map((commit) => [commit.oid, commit]));
 const children = new Map(entries.map((commit) => [commit.oid, 0]));
 for (const commit of entries) for (const parent of commit.parents) if (children.has(parent)) children.set(parent, children.get(parent) + 1);
 const head = branches[0].target;
-const ready = [bySha.get(head), ...entries.filter((commit) => children.get(commit.oid) === 0 && commit.oid !== head)].filter(Boolean);
+const ready = entries.filter((commit) => children.get(commit.oid) === 0);
 const commits = [];
 const emitted = new Set();
 while (ready.length) {
-  ready.sort((a, b) => a.oid === head ? -1 : b.oid === head ? 1 : Date.parse(b.committedAt) - Date.parse(a.committedAt));
+  ready.sort((a, b) => Date.parse(b.committedAt) - Date.parse(a.committedAt));
   const commit = ready.shift();
   if (emitted.has(commit.oid)) continue;
   emitted.add(commit.oid);

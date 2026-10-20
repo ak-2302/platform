@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-web-git-graph.mjs",
     "dev": "vite",
     "api": "node server/index.mjs",
     "build": "vite build",
