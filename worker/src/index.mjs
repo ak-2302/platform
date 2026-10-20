@@ -87,7 +87,7 @@ async function readJsonBody(request) {
 async function loadProposals(env) {
   if (!env.DB) return proposals;
   const result = await env.DB.prepare('SELECT payload FROM proposals WHERE song_id = ?1 ORDER BY created_at DESC').bind(manifest.id).all();
-  return result.results.map((row) => JSON.parse(row.payload));
+  return result.results.length ? result.results.map((row) => JSON.parse(row.payload)) : proposals;
 }
 
 async function storeProposal(env, proposal) {
