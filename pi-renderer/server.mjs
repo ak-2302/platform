@@ -15,7 +15,7 @@ function validSignature(body, header) {
 function send(res, status, value) { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)); }
 
 const server = createServer(async (req, res) => {
-  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, service: 'resonance-pi-renderer', rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0' });
+  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, service: 'resonance-pi-renderer', rendererReady: process.env.RENDERER_READY === 'true', rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0' });
   if (req.method === 'POST' && req.url === '/jobs') {
     let body = ''; for await (const chunk of req) body += chunk;
     if (!validSignature(body, req.headers['x-resonance-signature'])) return send(res, 401, { error: 'invalid signature' });
@@ -23,6 +23,7 @@ const server = createServer(async (req, res) => {
     if (input.engineCommit !== process.env.OPENDAW_COMMIT) return send(res, 409, { error: 'engine commit is not pinned on renderer' });
     if (process.env.BASE_SHA && input.baseSha !== process.env.BASE_SHA) return send(res, 409, { error: 'base SHA is not pinned on renderer' });
     if (typeof input.headSha !== 'string' || !/^[0-9a-f]{7,64}$/i.test(input.headSha)) return send(res, 400, { error: 'head SHA is required' });
+    if (process.env.RENDERER_READY !== 'true') return send(res, 503, { error: 'fixed renderer is not ready', retryable: true });
     const jobId = randomUUID(); jobs.set(jobId, {
       jobId,
       proposalId: input.proposalId || null,

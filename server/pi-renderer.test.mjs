@@ -17,7 +17,7 @@ function signature(body) {
 before(async () => {
   child = spawn(process.execPath, ['pi-renderer/server.mjs'], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(port), PI_RENDERER_SECRET: secret, OPENDAW_COMMIT: engineCommit, BASE_SHA: baseSha },
+    env: { ...process.env, PORT: String(port), PI_RENDERER_SECRET: secret, OPENDAW_COMMIT: engineCommit, BASE_SHA: baseSha, RENDERER_READY: 'true' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise((resolve, reject) => {
