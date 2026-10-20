@@ -158,7 +158,14 @@ export default {
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview' });
-    if (request.method === 'GET' && url.pathname === '/api/config') return json({ githubConfigured: Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || (env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY)) && env.GITHUB_REPOSITORY), githubAuthMode: env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (env.GITHUB_APP_ID ? 'github-app-private-key' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured')), githubSetup: { repositoryConfigured: Boolean(env.GITHUB_REPOSITORY), appIdConfigured: Boolean(env.GITHUB_APP_ID), installationIdConfigured: Boolean(env.GITHUB_INSTALLATION_ID), privateKeyConfigured: Boolean(env.GITHUB_APP_PRIVATE_KEY), webhookSecretConfigured: Boolean(env.GITHUB_WEBHOOK_SECRET) }, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+    if (request.method === 'GET' && url.pathname === '/api/config') {
+      const appReady = Boolean(env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY);
+      const githubConfigured = Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || appReady) && env.GITHUB_REPOSITORY);
+      const githubAuthMode = env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (appReady ? 'github-app-private-key' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured'));
+      const githubSetup = { repositoryConfigured: Boolean(env.GITHUB_REPOSITORY), appIdConfigured: Boolean(env.GITHUB_APP_ID), installationIdConfigured: Boolean(env.GITHUB_INSTALLATION_ID), privateKeyConfigured: Boolean(env.GITHUB_APP_PRIVATE_KEY), webhookSecretConfigured: Boolean(env.GITHUB_WEBHOOK_SECRET) };
+      const nextAction = !githubSetup.repositoryConfigured ? 'configure-repository' : (!githubSetup.privateKeyConfigured && !env.GITHUB_APP_TOKEN && !env.GITHUB_TOKEN ? 'register-github-app-private-key' : null);
+      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+    }
     if (request.method === 'POST' && url.pathname === '/api/webhooks/github') {
       const body = await request.text();
       if (!await verifyWebhookSignature(env.GITHUB_WEBHOOK_SECRET, body, request.headers.get('x-hub-signature-256'))) return json({ error: 'invalid webhook signature' }, 401);
