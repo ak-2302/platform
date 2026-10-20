@@ -36,9 +36,28 @@ function base64url(value) {
 }
 
 function pemToBytes(pem) {
-  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const isPkcs1 = pem.includes('BEGIN RSA PRIVATE KEY');
+  const base64 = pem.replace(/-----BEGIN (?:RSA )?PRIVATE KEY-----|-----END (?:RSA )?PRIVATE KEY-----|\s/g, '');
   const binary = atob(base64);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const der = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  if (!isPkcs1) return der;
+
+  // GitHub downloads RSA App keys as PKCS#1. Web Crypto imports RSA private
+  // keys as PKCS#8, so wrap the PKCS#1 payload in a PrivateKeyInfo envelope.
+  const derLength = (length) => {
+    if (length < 0x80) return Uint8Array.of(length);
+    const bytes = [];
+    for (let value = length; value > 0; value = Math.floor(value / 256)) bytes.unshift(value & 0xff);
+    return Uint8Array.of(0x80 | bytes.length, ...bytes);
+  };
+  const derSequence = (tag, value) => Uint8Array.of(tag, ...derLength(value.length), ...value);
+  const algorithm = derSequence(0x30, Uint8Array.of(
+    0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+    0x05, 0x00,
+  ));
+  const version = Uint8Array.of(0x02, 0x01, 0x00);
+  const privateKey = derSequence(0x04, der);
+  return derSequence(0x30, Uint8Array.of(...version, ...algorithm, ...privateKey));
 }
 
 async function githubToken(env) {
