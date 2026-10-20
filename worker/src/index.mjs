@@ -29,11 +29,23 @@ const commits = [
   { hash: 'b8d42e', title: 'Sketch the main melody', author: 'you', date: '5 days ago' },
   { hash: 'c2f7a1', title: 'Start with a blank canvas', author: 'n.kobayashi', date: '8 days ago' },
 ];
+let gitLogCache = { expiresAt: 0, value: commits };
 const proposals = [{ id: '#42', title: 'Bring the bassline forward in verse 2', author: 'Mika Ito', status: 'Ready for review', branch: 'proposal/42-bassline', baseSha: manifest.baseSha, headSha: 'd4c91a', render: 'ready' }];
 const renderJobs = new Map();
 const MAX_PROPOSAL_BODY_BYTES = 3_000_000;
 const MAX_SNAPSHOT_BASE64_BYTES = 2_500_000;
 let githubInstallationTokenCache;
+
+async function loadGitLog(env) {
+  if (gitLogCache.expiresAt > Date.now()) return gitLogCache.value;
+  const repository = env.GITHUB_REPOSITORY || 'ak-2302/song-demo';
+  const response = await fetch(`https://api.github.com/repos/${repository}/commits?sha=main&per_page=30`, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'resonance-api' } });
+  if (!response.ok) return commits;
+  const items = await response.json();
+  const value = items.map((item) => ({ hash: item.sha, title: item.commit?.message?.split('\n')[0] || 'Untitled commit', author: item.author?.login || item.commit?.author?.name || 'unknown', date: item.commit?.author?.date || '', branch: 'main', tone: ['#a8e6cf', '#ffcad4', '#c7ceea', '#e8c1a0'][item.sha.charCodeAt(0) % 4] }));
+  gitLogCache = { expiresAt: Date.now() + 60_000, value: value.length ? value : commits };
+  return gitLogCache.value;
+}
 
 function base64url(value) {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : new Uint8Array(value);
@@ -291,7 +303,7 @@ export default {
     }
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest, 200, 'public, max-age=300, s-maxage=300');
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files, 200, 'public, max-age=300, s-maxage=300');
-    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits, 200, 'public, max-age=60, s-maxage=60');
+    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(await loadGitLog(env), 200, 'public, max-age=60, s-maxage=60');
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(await loadProposals(env));
     if (request.method === 'POST' && url.pathname === '/api/songs/night-transit/proposals') {
       const authConfigured = Boolean(env.GITHUB_OAUTH_CLIENT_ID && env.GITHUB_OAUTH_CLIENT_SECRET && env.GITHUB_OAUTH_REDIRECT_URI && env.AUTH_SESSION_SECRET);
