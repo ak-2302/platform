@@ -21,6 +21,8 @@ const server = createServer(async (req, res) => {
     if (!validSignature(body, req.headers['x-resonance-signature'])) return send(res, 401, { error: 'invalid signature' });
     let input; try { input = JSON.parse(body); } catch { return send(res, 400, { error: 'invalid JSON' }); }
     if (input.engineCommit !== process.env.OPENDAW_COMMIT) return send(res, 409, { error: 'engine commit is not pinned on renderer' });
+    if (process.env.BASE_SHA && input.baseSha !== process.env.BASE_SHA) return send(res, 409, { error: 'base SHA is not pinned on renderer' });
+    if (typeof input.headSha !== 'string' || !/^[0-9a-f]{7,64}$/i.test(input.headSha)) return send(res, 400, { error: 'head SHA is required' });
     const jobId = randomUUID(); jobs.set(jobId, { jobId, status: 'queued', rendererVersion: process.env.RENDERER_VERSION || 'opendaw-pi-0.1.0' });
     // The actual fixed openDAW CLI invocation is intentionally isolated here.
     // It must read only the verified base/head SHAs and never execute repository code.

@@ -243,10 +243,22 @@ export default {
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${proposalRender[1]}`);
       if (!proposal || proposal.baseSha !== manifest.baseSha) return json({ error: 'proposal base SHA is not renderable' }, 409);
+      if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
+        const body = JSON.stringify({ songId: manifest.id, proposalId: proposal.id, projectPath: manifest.projectPath, engineCommit: manifest.engineCommit, baseSha: proposal.baseSha, headSha: proposal.headSha, rendererVersion: manifest.rendererVersion });
+        const signature = await signJob(env.PI_RENDERER_SECRET, body);
+        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
+        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+      }
       if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', previewOnly: true, baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: 'worker-preview-synth-0.1.0', baseUrl: `${url.origin}/audio/night-transit-base.wav`, proposalUrl: `${url.origin}/audio/night-transit-proposal.wav` }, 202);
     }
     const renderStatus = url.pathname.match(/^\/api\/(?:render|renders)\/([^/]+)$/);
-    if (renderStatus && request.method === 'GET') return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
+    if (renderStatus && request.method === 'GET') {
+      if (env.PI_RENDERER_URL) {
+        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs/${encodeURIComponent(renderStatus[1])}`);
+        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+      }
+      return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
+    }
     const jobMatch = url.pathname.match(/^\/api\/render\/([^/]+)$/);
     if (jobMatch && request.method === 'GET') {
       if (!env.PI_RENDERER_URL) return json({ error: 'Pi renderer is not configured' }, 503);

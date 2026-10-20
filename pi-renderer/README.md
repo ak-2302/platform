@@ -12,7 +12,8 @@ Copy `cloudflared-config.yml.example` to `/etc/cloudflared/config.yml`, replace 
 
 ```sh
 PI_RENDERER_SECRET=the-same-secret-used-by-the-worker
-OPENDAW_COMMIT=25af248f6df66b321f921b54930f94fe5c09898f
+OPENDAW_COMMIT=b9e8190b8b1a9da3fcac2d7ebf4c0fe9a821fe5b
+BASE_SHA=af11c3460d2c41c2f20a0f9bb18f98678f5073b2
 RENDERER_VERSION=opendaw-pi-0.1.0
 ```
 
