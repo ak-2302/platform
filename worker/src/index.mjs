@@ -279,6 +279,9 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits, 200, 'public, max-age=60, s-maxage=60');
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(await loadProposals(env));
     if (request.method === 'POST' && url.pathname === '/api/songs/night-transit/proposals') {
+      const authConfigured = Boolean(env.GITHUB_OAUTH_CLIENT_ID && env.GITHUB_OAUTH_CLIENT_SECRET && env.GITHUB_OAUTH_REDIRECT_URI && env.AUTH_SESSION_SECRET);
+      const user = authConfigured ? await sessionUser(request, env) : null;
+      if (authConfigured && !user) return json({ error: 'GitHub login is required before creating a proposal', nextAction: 'github-login' }, 401);
       const input = await readJsonBody(request).catch((error) => ({ _error: error.message }));
       if (input._error) return json({ error: input._error }, 413);
       if (!input.title?.trim()) return json({ error: 'title is required' }, 400);
@@ -292,13 +295,15 @@ export default {
       const current = await loadProposals(env);
       const number = 43 + current.length;
       const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'change';
-      const proposal = { id: `#${number}`, title: input.title.trim(), description: input.description || '', projectSnapshot: input.projectSnapshot || null, author: 'you', status: 'Draft', branch: `proposal/${number}-${slug}`, baseSha: manifest.baseSha, headSha: `worker-${Date.now().toString(16)}`, render: 'queued' };
+      const proposal = { id: `#${number}`, title: input.title.trim(), description: input.description || '', projectSnapshot: input.projectSnapshot || null, author: user?.name || user?.login || 'you', authorLogin: user?.login || null, authorId: user?.id || null, status: 'Draft', branch: `proposal/${number}-${slug}`, baseSha: manifest.baseSha, headSha: `worker-${Date.now().toString(16)}`, render: 'queued' };
       proposals.unshift(proposal);
       await storeProposal(env, proposal);
       return json(proposal, 201);
     }
     const pullRequest = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/pull-request$/);
     if (pullRequest && request.method === 'POST') {
+      const authConfigured = Boolean(env.GITHUB_OAUTH_CLIENT_ID && env.GITHUB_OAUTH_CLIENT_SECRET && env.GITHUB_OAUTH_REDIRECT_URI && env.AUTH_SESSION_SECRET);
+      if (authConfigured && !await sessionUser(request, env)) return json({ error: 'GitHub login is required before creating a pull request', nextAction: 'github-login' }, 401);
       const input = await readJsonBody(request).catch(() => ({}));
       const current = await loadProposals(env);
       const proposal = current.find((item) => item.id === `#${pullRequest[1]}`) || (input.id === `#${pullRequest[1]}` ? input : null);
