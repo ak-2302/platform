@@ -160,6 +160,34 @@ async function signJob(secret, body) {
   return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function cookieValue(request, name) {
+  const cookies = request.headers.get('cookie') || '';
+  return cookies.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1) || null;
+}
+
+async function hmacHex(secret, value) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sessionUser(request, env) {
+  if (!env.AUTH_SESSION_SECRET) return null;
+  const value = cookieValue(request, 'resonance_session');
+  if (!value) return null;
+  const separator = value.lastIndexOf('.');
+  if (separator < 1) return null;
+  const payload = value.slice(0, separator);
+  const signature = value.slice(separator + 1);
+  if (signature !== await hmacHex(env.AUTH_SESSION_SECRET, payload)) return null;
+  try {
+    const user = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload.replace(/-/g, '+').replace(/_/g, '/')), (char) => char.charCodeAt(0))));
+    return user.exp > Date.now() ? user : null;
+  } catch { return null; }
+}
+
+function authSetupResponse() { return json({ error: 'GitHub OAuth is not configured', nextAction: 'configure-github-oauth-secrets' }, 503); }
+
 async function verifyWebhookSignature(secret, body, signature) {
   if (!secret || !signature?.startsWith('sha256=')) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -187,6 +215,38 @@ export default {
       const nextAction = !githubSetup.repositoryConfigured ? 'configure-repository' : (!githubSetup.privateKeyConfigured && !env.GITHUB_APP_TOKEN && !env.GITHUB_TOKEN ? 'register-github-app-private-key' : null);
       return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
     }
+    if (request.method === 'GET' && url.pathname === '/api/auth/github') {
+      if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.GITHUB_OAUTH_REDIRECT_URI || !env.AUTH_SESSION_SECRET) return authSetupResponse();
+      const bytes = new Uint8Array(24); crypto.getRandomValues(bytes);
+      const state = base64url(bytes);
+      const authorize = new URL('https://github.com/login/oauth/authorize');
+      authorize.searchParams.set('client_id', env.GITHUB_OAUTH_CLIENT_ID);
+      authorize.searchParams.set('redirect_uri', env.GITHUB_OAUTH_REDIRECT_URI);
+      authorize.searchParams.set('scope', 'read:user');
+      authorize.searchParams.set('state', state);
+      return new Response(null, { status: 302, headers: { location: authorize.toString(), 'set-cookie': `resonance_oauth_state=${state}; Max-Age=600; Path=/api/auth; HttpOnly; Secure; SameSite=Lax` } });
+    }
+    if (request.method === 'GET' && url.pathname === '/api/auth/github/callback') {
+      if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.GITHUB_OAUTH_REDIRECT_URI || !env.AUTH_SESSION_SECRET) return authSetupResponse();
+      const state = url.searchParams.get('state');
+      const code = url.searchParams.get('code');
+      if (!state || state !== cookieValue(request, 'resonance_oauth_state') || !code) return json({ error: 'invalid GitHub OAuth callback' }, 400);
+      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ client_id: env.GITHUB_OAUTH_CLIENT_ID, client_secret: env.GITHUB_OAUTH_CLIENT_SECRET, code, redirect_uri: env.GITHUB_OAUTH_REDIRECT_URI }) });
+      if (!tokenResponse.ok) return json({ error: 'GitHub OAuth token exchange failed' }, 502);
+      const token = await tokenResponse.json();
+      if (!token.access_token) return json({ error: 'GitHub OAuth token was not returned' }, 502);
+      const userResponse = await fetch('https://api.github.com/user', { headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token.access_token}`, 'x-github-api-version': '2022-11-28', 'user-agent': 'resonance-api' } });
+      if (!userResponse.ok) return json({ error: 'GitHub user lookup failed' }, 502);
+      const profile = await userResponse.json();
+      const session = base64url(JSON.stringify({ id: profile.id, login: profile.login, name: profile.name || profile.login, avatarUrl: profile.avatar_url || null, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
+      const signed = `${session}.${await hmacHex(env.AUTH_SESSION_SECRET, session)}`;
+      return new Response(null, { status: 302, headers: { location: env.GITHUB_AUTH_SUCCESS_REDIRECT || 'https://resonance.xn--n8jl2g.xn--q9jyb4c/', 'set-cookie': `resonance_session=${signed}; Max-Age=604800; Path=/; HttpOnly; Secure; SameSite=Lax` } });
+    }
+    if (request.method === 'GET' && url.pathname === '/api/auth/me') {
+      const user = await sessionUser(request, env);
+      return user ? json({ authenticated: true, user }, 200, 'private, max-age=30') : json({ authenticated: false }, 401, 'no-store');
+    }
+    if (request.method === 'POST' && url.pathname === '/api/auth/logout') return new Response(null, { status: 204, headers: { 'set-cookie': 'resonance_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax', 'access-control-allow-origin': '*' } });
     if (request.method === 'POST' && url.pathname === '/api/webhooks/github') {
       const body = await request.text();
       if (!await verifyWebhookSignature(env.GITHUB_WEBHOOK_SECRET, body, request.headers.get('x-hub-signature-256'))) return json({ error: 'invalid webhook signature' }, 401);
