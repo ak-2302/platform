@@ -9,7 +9,8 @@
 | openDAW連携 | 完了 | 固定engine commitとproject snapshot連携を実装 |
 | D1提案・レンダージョブ保存 | 完了 | migrations `0001`〜`0003`を適用済み |
 | Webhook署名検証 | 完了 | HMAC検証とdelivery重複排除を実装 |
-| GitHub App設定 | 要設定 | App ID・Installation IDは登録済み。秘密鍵をWorker secretへ登録する |
+| GitHub App設定 | 一部完了 | OAuth Client Secret・セッション署名秘密・コールバックURLは設定済み。App秘密鍵をWorker secretへ登録する |
+| GitHubログイン | 完了 | `/api/auth/github`の302、`/api/auth/me`、提案作成時のログイン必須を確認 |
 | GitHub PR作成 | 保留 | GitHub App秘密鍵登録後に本番経路を検証 |
 | Pi固定レンダラー | 保留 | Piへ配布ZIPを配置し、固定rendererを検証後`RENDERER_READY=true`にする |
 | A/B試聴 | Worker preview | Pi未接続中は簡易WAV。Pi接続後に実レンダーへ切り替える |
