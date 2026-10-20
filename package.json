@@ -10,6 +10,8 @@
     "build": "vite build",
     "deploy:github-pages": "npm run build",
     "preview": "vite preview",
+    "format": "prettier --write src worker/src server scripts",
+    "format:check": "prettier --check src worker/src server scripts",
     "check": "npm run test && npm run build",
     "test": "node --test server/*.test.mjs"
   },
@@ -26,5 +28,8 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.64.10"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
   }
 }

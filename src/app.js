@@ -1,9 +1,108 @@
-const proposals=[['#42','Bring the bassline forward in verse 2','Mika Ito','MI','#a8e6cf','Ready for review','18','6'],['#41','Add a softer kick pattern to the intro','noah.wav','NW','#ffcad4','In review','12','3'],['#39','Re-space the vocal chop at 1:16','Sora K.','SK','#c7ceea','Merged','24','11']];
-const commits=[['a91f2c','Add kick + sub bass foundation','Mika Ito','MI','#e8c1a0','2 days ago'],['b8d42e','Sketch the main melody','you','YK','#9eb5df','5 days ago'],['c2f7a1','Start with a blank canvas','n.kobayashi','NK','#d9b8d8','8 days ago']];
-const wave=()=>`<div class="wave compact">${Array.from({length:54},(_,i)=>`<i style="height:${18+Math.abs(Math.sin(i*1.7))*64+(i%5)*3}%;opacity:${.35+(i%4)*.13}"></i>`).join('')}</div>`;
-function proposal(p){return `<article class="proposal"><div class="proposal-icon">⇄</div><div class="proposal-info"><div class="proposal-top"><span class="pr-id">${p[0]}</span><h3>${p[1]}</h3><span class="status ${p[5]==='Merged'?'merged':''}">${p[5]}</span></div><div class="proposal-by"><span class="avatar" style="background:${p[4]}">${p[3]}</span><span>${p[2]}</span><span>•</span><span>2h ago</span><span>•</span><span class="branch">⑂ proposal/${p[0].slice(1)}-night-texture</span></div><div class="proposal-wave">${wave()}<button class="listen">▶ A/B listen</button></div></div><div class="proposal-stats"><span>◉ ${p[6]}</span><span>⇄ ${p[7]}</span><span>›</span></div></article>`}
-function commit(c,i){return `<div class="commit ${i===commits.length-1?'last':''}"><div class="commit-line"><span class="commit-dot" style="background:${c[4]}"></span><span class="commit-rail"></span></div><div class="commit-body"><div class="commit-date">${c[5]} <span>· ${c[0]}</span></div><h3>${c[1]}</h3><div class="commit-by"><span class="avatar" style="background:${c[4]}">${c[3]}</span><span>${c[2]}</span></div></div><button class="commit-play">▶</button></div>`}
-function render(tab='overview'){const panel=document.querySelector('#panel'); if(tab==='overview') panel.innerHTML=`<div class="section-heading"><div><h2>Open proposals</h2><p>Listen, leave a note, or help decide what lands next.</p></div><button class="text-btn" data-tab="proposals">View all ↗</button></div><div class="proposal-list">${proposals.map(proposal).join('')}</div><div class="section-heading history-head"><div><h2>Evolution of this track</h2><p>Every contribution leaves a trace in the sound.</p></div><button class="text-btn">View commit history ↗</button></div><div class="timeline">${commits.map(commit).join('')}</div>`; if(tab==='proposals') panel.innerHTML=`<div class="section-heading"><div><h2>All proposals</h2><p>3 open threads in Night Transit.</p></div><button class="primary" id="newProposal">⇄ New proposal</button></div><div class="proposal-list">${proposals.map(proposal).join('')}</div>`; if(tab==='history') panel.innerHTML=`<div class="section-heading"><div><h2>Sound evolution</h2><p>Replay the moments that shaped Night Transit.</p></div></div><div class="history-card"><div class="history-player"><button class="play small" id="historyPlay">▶</button><div><b>Evolution mix</b><span>Play through 3 versions</span></div>${wave()}</div>${commits.map(commit).join('')}</div>`; if(tab==='files') panel.innerHTML=`<div class="section-heading"><div><h2>Project files</h2><p>Everything you need to remix this track.</p></div></div><div class="files-card">${[['project/main.od','openDAW project','1.8 MB'],['song.json','manifest','2.1 KB'],['credits.json','contributors','1.4 KB'],['LICENSE','CC BY-SA 4.0','1.1 KB']].map(f=>`<div class="file-row"><div class="file-icon">▦</div><div><b>${f[0]}</b><small>${f[1]}</small></div><span>${f[2]}</span><span>›</span></div>`).join('')}</div>`; bind();}
-function bind(){document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('tab-active',x===b));render(b.dataset.tab)}); document.querySelectorAll('.listen,#newProposal,#proposeBtn').forEach(b=>b.onclick=openModal)}
-function openModal(){document.querySelector('#modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal"><div class="modal-head"><div><div class="eyebrow">PROPOSE A CHANGE</div><h2>Make Night Transit yours.</h2></div><button class="close" id="close">×</button></div><p class="modal-copy">Open the project in the browser DAW, save your changes, then describe what you changed for the community.</p><div class="field"><label>Change title</label><input value="Add a late-night texture"/></div><div class="field"><label>What did you change?</label><textarea>Added a subtle granular layer in the second half to lift the transition into the outro.</textarea></div><div class="render-note">◷ <span>Preview render will be generated after submission.</span></div><button class="primary wide" id="submit">⇄ Create proposal</button></div></div>`; document.querySelector('#close').onclick=()=>document.querySelector('#modalRoot').innerHTML=''; document.querySelector('#submit').onclick=()=>{document.querySelector('.modal').innerHTML=`<div class="success-icon">✓</div><h2>Proposal is ready</h2><p>Your change has been committed to <b>proposal/43-night-texture</b>. The PR is ready for the community to listen and review.</p><div class="modal-pr">⇄ <div><b>#43 · Add a late-night texture</b><small>Draft · waiting for preview render</small></div>↗</div><button class="primary wide" id="done">Back to Night Transit</button>`;document.querySelector('#done').onclick=()=>document.querySelector('#modalRoot').innerHTML=''}}
-let playing=false;document.querySelector('#playBtn').onclick=()=>{playing=!playing;document.querySelector('#playBtn').textContent=playing?'Ⅱ':'▶';document.querySelector('#progress').style.width=playing?'33%':'8%';document.querySelector('#currentTime').textContent=playing?'01:18':'00:00'};render();
+const proposals = [
+  [
+    "#42",
+    "Bring the bassline forward in verse 2",
+    "Mika Ito",
+    "MI",
+    "#a8e6cf",
+    "Ready for review",
+    "18",
+    "6",
+  ],
+  [
+    "#41",
+    "Add a softer kick pattern to the intro",
+    "noah.wav",
+    "NW",
+    "#ffcad4",
+    "In review",
+    "12",
+    "3",
+  ],
+  [
+    "#39",
+    "Re-space the vocal chop at 1:16",
+    "Sora K.",
+    "SK",
+    "#c7ceea",
+    "Merged",
+    "24",
+    "11",
+  ],
+];
+const commits = [
+  [
+    "a91f2c",
+    "Add kick + sub bass foundation",
+    "Mika Ito",
+    "MI",
+    "#e8c1a0",
+    "2 days ago",
+  ],
+  ["b8d42e", "Sketch the main melody", "you", "YK", "#9eb5df", "5 days ago"],
+  ["c2f7a1", "Start with a blank canvas", "n.kobayashi", "NK", "#d9b8d8", "8 days ago"],
+];
+const wave = () =>
+  `<div class="wave compact">${Array.from({ length: 54 }, (_, i) => `<i style="height:${18 + Math.abs(Math.sin(i * 1.7)) * 64 + (i % 5) * 3}%;opacity:${0.35 + (i % 4) * 0.13}"></i>`).join("")}</div>`;
+function proposal(p) {
+  return `<article class="proposal"><div class="proposal-icon">⇄</div><div class="proposal-info"><div class="proposal-top"><span class="pr-id">${p[0]}</span><h3>${p[1]}</h3><span class="status ${p[5] === "Merged" ? "merged" : ""}">${p[5]}</span></div><div class="proposal-by"><span class="avatar" style="background:${p[4]}">${p[3]}</span><span>${p[2]}</span><span>•</span><span>2h ago</span><span>•</span><span class="branch">⑂ proposal/${p[0].slice(1)}-night-texture</span></div><div class="proposal-wave">${wave()}<button class="listen">▶ A/B listen</button></div></div><div class="proposal-stats"><span>◉ ${p[6]}</span><span>⇄ ${p[7]}</span><span>›</span></div></article>`;
+}
+function commit(c, i) {
+  return `<div class="commit ${i === commits.length - 1 ? "last" : ""}"><div class="commit-line"><span class="commit-dot" style="background:${c[4]}"></span><span class="commit-rail"></span></div><div class="commit-body"><div class="commit-date">${c[5]} <span>· ${c[0]}</span></div><h3>${c[1]}</h3><div class="commit-by"><span class="avatar" style="background:${c[4]}">${c[3]}</span><span>${c[2]}</span></div></div><button class="commit-play">▶</button></div>`;
+}
+function render(tab = "overview") {
+  const panel = document.querySelector("#panel");
+  if (tab === "overview")
+    panel.innerHTML = `<div class="section-heading"><div><h2>Open proposals</h2><p>Listen, leave a note, or help decide what lands next.</p></div><button class="text-btn" data-tab="proposals">View all ↗</button></div><div class="proposal-list">${proposals.map(proposal).join("")}</div><div class="section-heading history-head"><div><h2>Evolution of this track</h2><p>Every contribution leaves a trace in the sound.</p></div><button class="text-btn">View commit history ↗</button></div><div class="timeline">${commits.map(commit).join("")}</div>`;
+  if (tab === "proposals")
+    panel.innerHTML = `<div class="section-heading"><div><h2>All proposals</h2><p>3 open threads in Night Transit.</p></div><button class="primary" id="newProposal">⇄ New proposal</button></div><div class="proposal-list">${proposals.map(proposal).join("")}</div>`;
+  if (tab === "history")
+    panel.innerHTML = `<div class="section-heading"><div><h2>Sound evolution</h2><p>Replay the moments that shaped Night Transit.</p></div></div><div class="history-card"><div class="history-player"><button class="play small" id="historyPlay">▶</button><div><b>Evolution mix</b><span>Play through 3 versions</span></div>${wave()}</div>${commits.map(commit).join("")}</div>`;
+  if (tab === "files")
+    panel.innerHTML = `<div class="section-heading"><div><h2>Project files</h2><p>Everything you need to remix this track.</p></div></div><div class="files-card">${[
+      ["project/main.od", "openDAW project", "1.8 MB"],
+      ["song.json", "manifest", "2.1 KB"],
+      ["credits.json", "contributors", "1.4 KB"],
+      ["LICENSE", "CC BY-SA 4.0", "1.1 KB"],
+    ]
+      .map(
+        (f) =>
+          `<div class="file-row"><div class="file-icon">▦</div><div><b>${f[0]}</b><small>${f[1]}</small></div><span>${f[2]}</span><span>›</span></div>`,
+      )
+      .join("")}</div>`;
+  bind();
+}
+function bind() {
+  document.querySelectorAll("[data-tab]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        document
+          .querySelectorAll(".tabs button")
+          .forEach((x) => x.classList.toggle("tab-active", x === b));
+        render(b.dataset.tab);
+      }),
+  );
+  document
+    .querySelectorAll(".listen,#newProposal,#proposeBtn")
+    .forEach((b) => (b.onclick = openModal));
+}
+function openModal() {
+  document.querySelector("#modalRoot").innerHTML =
+    `<div class="modal-backdrop"><div class="modal"><div class="modal-head"><div><div class="eyebrow">PROPOSE A CHANGE</div><h2>Make Night Transit yours.</h2></div><button class="close" id="close">×</button></div><p class="modal-copy">Open the project in the browser DAW, save your changes, then describe what you changed for the community.</p><div class="field"><label>Change title</label><input value="Add a late-night texture"/></div><div class="field"><label>What did you change?</label><textarea>Added a subtle granular layer in the second half to lift the transition into the outro.</textarea></div><div class="render-note">◷ <span>Preview render will be generated after submission.</span></div><button class="primary wide" id="submit">⇄ Create proposal</button></div></div>`;
+  document.querySelector("#close").onclick = () =>
+    (document.querySelector("#modalRoot").innerHTML = "");
+  document.querySelector("#submit").onclick = () => {
+    document.querySelector(".modal").innerHTML =
+      `<div class="success-icon">✓</div><h2>Proposal is ready</h2><p>Your change has been committed to <b>proposal/43-night-texture</b>. The PR is ready for the community to listen and review.</p><div class="modal-pr">⇄ <div><b>#43 · Add a late-night texture</b><small>Draft · waiting for preview render</small></div>↗</div><button class="primary wide" id="done">Back to Night Transit</button>`;
+    document.querySelector("#done").onclick = () =>
+      (document.querySelector("#modalRoot").innerHTML = "");
+  };
+}
+let playing = false;
+document.querySelector("#playBtn").onclick = () => {
+  playing = !playing;
+  document.querySelector("#playBtn").textContent = playing ? "Ⅱ" : "▶";
+  document.querySelector("#progress").style.width = playing ? "33%" : "8%";
+  document.querySelector("#currentTime").textContent = playing ? "01:18" : "00:00";
+};
+render();

@@ -1,49 +1,851 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {Play, GitCommit, GitPullRequest, GitBranch, Headphones, Search, Bell, Settings2, ArrowUpRight, ChevronRight, CircleDot, Layers3, Sparkles, Github, Music2, CheckCircle2, Clock3, SlidersHorizontal, MoreHorizontal, GitMerge, X, Volume2} from 'lucide-react';
-import './styles.css';
-import '@web-git-graph/web/register';
-import {GitHubGitGraphProvider} from '@web-git-graph/web/providers/github';
-import {API_BASE, createProposalFromApi, createPullRequest, getConfig, getCurrentUser, getHealth, getRender, listCommits, listFiles, listProposals, listProposalsFromApi, openProject, requestProjectSnapshot, requestRender, songManifest} from './platformApi';
+import React, { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Play,
+  GitCommit,
+  GitPullRequest,
+  GitBranch,
+  Headphones,
+  Search,
+  Bell,
+  Settings2,
+  ArrowUpRight,
+  ChevronRight,
+  CircleDot,
+  Layers3,
+  Sparkles,
+  Github,
+  Music2,
+  CheckCircle2,
+  Clock3,
+  SlidersHorizontal,
+  MoreHorizontal,
+  GitMerge,
+  X,
+  Volume2,
+} from "lucide-react";
+import "./styles.css";
+import "@web-git-graph/web/register";
+import { CommitGraph } from "./components/CommitGraph";
+import {
+  API_BASE,
+  createProposalFromApi,
+  createPullRequest,
+  getConfig,
+  getCurrentUser,
+  getHealth,
+  getRender,
+  listCommits,
+  listFiles,
+  listProposals,
+  listProposalsFromApi,
+  openProject,
+  requestProjectSnapshot,
+  requestRender,
+  songManifest,
+} from "./platformApi";
 
-const proposals=[
- {id:'#42', title:'Bring the bassline forward in verse 2', author:'Mika Ito', avatar:'MI', branch:'proposal/42-bassline', time:'2h ago', status:'Ready for review', color:'#a8e6cf', votes:18, comments:6, duration:'03:42'},
- {id:'#41', title:'Add a softer kick pattern to the intro', author:'noah.wav', avatar:'NW', branch:'proposal/41-soft-kick', time:'yesterday', status:'In review', color:'#ffcad4', votes:12, comments:3, duration:'03:42'},
- {id:'#39', title:'Re-space the vocal chop at 1:16', author:'Sora K.', avatar:'SK', branch:'proposal/39-vocal-chop', time:'3d ago', status:'Merged', color:'#c7ceea', votes:24, comments:11, duration:'03:42'}
+const proposals = [
+  {
+    id: "#42",
+    title: "Bring the bassline forward in verse 2",
+    author: "Mika Ito",
+    avatar: "MI",
+    branch: "proposal/42-bassline",
+    time: "2h ago",
+    status: "Ready for review",
+    color: "#a8e6cf",
+    votes: 18,
+    comments: 6,
+    duration: "03:42",
+  },
+  {
+    id: "#41",
+    title: "Add a softer kick pattern to the intro",
+    author: "noah.wav",
+    avatar: "NW",
+    branch: "proposal/41-soft-kick",
+    time: "yesterday",
+    status: "In review",
+    color: "#ffcad4",
+    votes: 12,
+    comments: 3,
+    duration: "03:42",
+  },
+  {
+    id: "#39",
+    title: "Re-space the vocal chop at 1:16",
+    author: "Sora K.",
+    avatar: "SK",
+    branch: "proposal/39-vocal-chop",
+    time: "3d ago",
+    status: "Merged",
+    color: "#c7ceea",
+    votes: 24,
+    comments: 11,
+    duration: "03:42",
+  },
 ];
-const commits=[
- {hash:'a91f2c', title:'Add kick + sub bass foundation', who:'Mika Ito', when:'2 days ago', tone:'#e8c1a0', icon:'bass'},
- {hash:'b8d42e', title:'Sketch the main melody', who:'you', when:'5 days ago', tone:'#9eb5df', icon:'melody'},
- {hash:'c2f7a1', title:'Start with a blank canvas', who:'n.kobayashi', when:'8 days ago', tone:'#d9b8d8', icon:'start'}
+const commits = [
+  {
+    hash: "a91f2c",
+    title: "Add kick + sub bass foundation",
+    who: "Mika Ito",
+    when: "2 days ago",
+    tone: "#e8c1a0",
+    icon: "bass",
+  },
+  {
+    hash: "b8d42e",
+    title: "Sketch the main melody",
+    who: "you",
+    when: "5 days ago",
+    tone: "#9eb5df",
+    icon: "melody",
+  },
+  {
+    hash: "c2f7a1",
+    title: "Start with a blank canvas",
+    who: "n.kobayashi",
+    when: "8 days ago",
+    tone: "#d9b8d8",
+    icon: "start",
+  },
 ];
 
-function Wave({compact=false}){return <div className={compact?'wave compact':'wave'}>{Array.from({length:compact?54:76},(_,i)=><i key={i} style={{height:`${18+Math.abs(Math.sin(i*1.7))*64+((i%5)*3)}%`, opacity:.35+(i%4)*.13}}/>)}</div>}
-function Avatar({initials,color='#a8e6cf'}){return <span className="avatar" style={{background:color}}>{initials}</span>}
-function App(){
- const [activeTab,setActiveTab]=useState('Overview'); const [showSubmit,setShowSubmit]=useState(false); const [submitted,setSubmitted]=useState(null); const [query,setQuery]=useState(''); const [dawConnected,setDawConnected]=useState(false); const [proposalItems,setProposalItems]=useState(listProposals); const [fileItems,setFileItems]=useState([]); const [commitItems,setCommitItems]=useState(commits); const [githubConfigured,setGithubConfigured]=useState(false); const [githubNextAction,setGithubNextAction]=useState(null); const [authConfigured,setAuthConfigured]=useState(false); const [currentUser,setCurrentUser]=useState(null); const [rendererMode,setRendererMode]=useState('checking');
- useEffect(()=>{listProposalsFromApi().then(setProposalItems).catch(()=>{});listFiles().then(setFileItems).catch(()=>{});listCommits().then(setCommitItems).catch(()=>{});getConfig().then(config=>{setGithubConfigured(config.githubConfigured);setGithubNextAction(config.nextAction||null);setAuthConfigured(config.authConfigured===true);return config.authConfigured?getCurrentUser():null}).then(session=>setCurrentUser(session?.user||null)).catch(()=>{});getHealth().then(health=>setRendererMode(health.renderer||'unknown')).catch(()=>setRendererMode('unavailable'));},[]);
- const openProposal=(proposal)=>{setSubmitted({...proposal,listenOnly:true,renderJob:{status:'ready',previewOnly:true,rendererVersion:songManifest.rendererVersion,baseUrl:`${API_BASE}/audio/night-transit-base.wav`,proposalUrl:`${API_BASE}/audio/night-transit-proposal.wav`}});setShowSubmit(true)};
- return <div className="app">
-  <header className="topbar"><div className="brand"><span className="brand-mark"><Music2 size={18}/></span><span>re:sonance</span><small>beta</small></div><nav><button className="nav-active">Explore</button><button>My work</button><button>Community</button></nav><div className="top-actions"><div className="search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search songs, creators..."/></div><button className="icon-btn"><Bell size={18}/><b className="notif">3</b></button>{authConfigured&&!currentUser&&<a className="github-login" href={`${API_BASE}/api/auth/github`}>Sign in with GitHub</a>}{currentUser?<Avatar initials={(currentUser.login||'YK').slice(0,2).toUpperCase()} color="#f2c6a0"/>:<Avatar initials="YK" color="#f2c6a0"/>}</div></header>
-  <main><div className="crumbs"><span>Explore</span><ChevronRight size={14}/><span>Electronic</span><ChevronRight size={14}/><strong>Night Transit</strong></div>
-   <section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="live-dot"/> OPEN COLLABORATION <span className="dot-sep">•</span> 14 contributors</div><h1>Night Transit</h1><p className="subtitle">A restless, late-night electronic sketch. Find a pocket for your idea and help this track become something unexpected.</p><div className="hero-meta"><Avatar initials="NK" color="#d9b8d8"/><span>Started by <b>n.kobayashi</b></span><span className="meta-sep"/> <span>Last updated 2h ago</span></div></div><div className="hero-art"><div className="orb orb-a"/><div className="orb orb-b"/><div className="grid-lines"/><div className="art-label">SIDE A / 02</div><div className="art-note">∞</div></div></section>
-   <section className="player"><div className="player-main"><div className="latest-render"><span className="eyebrow">LATEST MAIN RENDER</span><b>Night Transit · main</b></div><audio className="latest-audio" controls preload="metadata" src={`${API_BASE}/audio/night-transit-base.wav`} aria-label="Latest main branch render"/><Volume2 size={17} className="muted-icon"/></div><div className="player-actions"><button className="secondary" onClick={()=>setDawConnected(openProject().connected)}><Headphones size={16}/> {dawConnected?'DAW connected':'Open in DAW'}</button><button className="primary" onClick={()=>setShowSubmit(true)}><GitPullRequest size={16}/> Propose a change</button></div></section>
-   {dawConnected&&<div className="integration-banner">Browser DAW connected · {songManifest.projectPath} · engine {songManifest.engineCommit}<button onClick={requestProjectSnapshot}>Refresh project snapshot</button></div>}
-   <div className="service-status"><span className={githubConfigured?'status-dot ready':'status-dot'}></span>{githubConfigured?'GitHub App connected':githubNextAction==='register-github-app-private-key'?<a href="https://github.com/settings/apps/resonance-platform/key_pairs" target="_blank" rel="noreferrer" style={{color:'inherit'}}>GitHub App setup: private key required ↗</a>:'GitHub App not configured'}<span>·</span> renderer {rendererMode==='tailscale-pi'?'Pi trusted renderer':rendererMode==='github-actions'?'GitHub Actions trusted renderer':rendererMode==='worker-preview'?'Worker preview':rendererMode}</div>
-   <div className="content-grid"><section className="main-column"><div className="tabs">{['Overview','Proposals','History','Files'].map(t=><button key={t} onClick={()=>setActiveTab(t)} className={activeTab===t?'tab-active':''}>{t}{t==='Proposals'&&<span className="count">{proposalItems.length}</span>}</button>)}</div>
-    {activeTab==='Overview' && <><div className="section-heading"><div><h2>Open proposals</h2><p>Listen, leave a note, or help decide what lands next.</p></div><button className="text-btn" onClick={()=>setActiveTab('Proposals')}>View all <ArrowUpRight size={15}/></button></div><div className="proposal-list">{proposalItems.map(p=><Proposal key={p.id} p={p} onOpen={()=>openProposal(p)}/>)}</div><div className="section-heading history-head"><div><h2>Git history</h2><p>Hover a commit to preview that version of the song.</p></div><button className="text-btn" onClick={()=>setActiveTab('History')}>Open full history <ArrowUpRight size={15}/></button></div><CommitGraph commits={commitItems}/></>}
-    {activeTab==='Proposals' && <><div className="section-heading"><div><h2>All proposals</h2><p>{proposalItems.length} threads in Night Transit.</p></div><button className="primary" onClick={()=>setShowSubmit(true)}><GitPullRequest size={16}/> New proposal</button></div><div className="proposal-list">{proposalItems.map(p=><Proposal key={p.id} p={p} onOpen={()=>openProposal(p)}/>)}</div></>}
-    {activeTab==='History' && <><div className="section-heading"><div><h2>Sound evolution</h2><p>Replay the moments that shaped Night Transit.</p></div></div><CommitGraph commits={commitItems} expanded/></>}
-    {activeTab==='Files' && <><div className="section-heading"><div><h2>Project files</h2><p>Everything you need to remix this track.</p></div></div><div className="files-card">{(fileItems.length?fileItems:[{path:'project/main.od',type:'openDAW project',size:'1.8 MB'},{path:'song.json',type:'manifest',size:'2.1 KB'},{path:'credits.json',type:'contributors',size:'1.4 KB'},{path:'LICENSE',type:'CC BY-SA 4.0',size:'1.1 KB'}]).map(file=><FileRow key={file.path} name={file.path} type={file.type} size={file.size}/>)}</div></>}
-   </section><aside className="side-column"><div className="side-card task-card"><div className="card-kicker"><Sparkles size={15}/> GOOD FIRST CONTRIBUTIONS</div><h3>What could this song use?</h3><p>Small, focused changes are easier to review and more likely to make the final mix.</p><div className="task"><span className="task-icon">♬</span><div><b>Add a bridge texture</b><small>Open issue · 2 comments</small></div><ChevronRight size={16}/></div><div className="task"><span className="task-icon">◒</span><div><b>Tighten the hi-hat groove</b><small>Open issue · 1 comment</small></div><ChevronRight size={16}/></div><button className="full-btn">See all tasks <ArrowUpRight size={15}/></button></div><div className="side-card details"><div className="side-title"><h3>Project details</h3><Settings2 size={16}/></div><Detail label="Tempo" value="128 BPM"/><Detail label="Key" value="F♯ minor"/><Detail label="License" value="CC BY-SA 4.0"/><Detail label="Engine" value={`openDAW · ${songManifest.engineCommit.slice(0,7)}`}/><div className="tag-row"><span>electronic</span><span>ambient</span><span>night-drive</span></div></div><div className="side-card contributors"><div className="side-title"><h3>Contributors <span>14</span></h3><button className="more"><MoreHorizontal size={17}/></button></div><div className="avatar-stack"><Avatar initials="NK" color="#d9b8d8"/><Avatar initials="MI" color="#a8e6cf"/><Avatar initials="NW" color="#ffcad4"/><Avatar initials="SK" color="#c7ceea"/><Avatar initials="+10" color="#e8e4d9"/></div><p>14 people have shaped this track so far.</p><button className="full-btn">View credits <ArrowUpRight size={15}/></button></div></aside></div>
-  </main>
-  {showSubmit&&<Modal submitted={submitted} onClose={()=>{setShowSubmit(false);setSubmitted(null)}} onRetry={async()=>{const job=await requestRender(submitted.id);setSubmitted(value=>value?{...value,renderJob:job}:value);}} onSubmit={async(data)=>{const snapshot=await requestProjectSnapshot();const p=await createProposalFromApi({...data,projectSnapshot:snapshot});setProposalItems(await listProposalsFromApi());const pullRequest=await createPullRequest(p.id);const job=await requestRender(p.id);setSubmitted({...p,pullRequest,renderJob:job});const poll=async()=>{try{const current=await getRender(job.jobId);setSubmitted(value=>value?{...value,renderJob:current}:value);if(current.status==='queued'||current.status==='running')window.setTimeout(poll,1500)}catch(error){setSubmitted(value=>value?{...value,renderJob:{...job,status:'failed',error:error instanceof Error?error.message:'render status failed'}}:value)}};window.setTimeout(poll,450)}}/>}<footer><span>re:sonance is open source music collaboration.</span><span><Github size={14}/><a href="https://github.com/ak-2302/platform" target="_blank" rel="noreferrer"> ak-2302/platform</a> <span className="dot-sep">•</span> MIT + CC</span></footer>
- </div>
+function Wave({ compact = false }) {
+  return (
+    <div className={compact ? "wave compact" : "wave"}>
+      {Array.from({ length: compact ? 54 : 76 }, (_, i) => (
+        <i
+          key={i}
+          style={{
+            height: `${18 + Math.abs(Math.sin(i * 1.7)) * 64 + (i % 5) * 3}%`,
+            opacity: 0.35 + (i % 4) * 0.13,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
-function Proposal({p,onOpen}){const pullRequestUrl=p.pullRequest?.url||p.pullRequest?.html_url;return <article className="proposal"><div className="proposal-icon"><GitPullRequest size={18}/></div><div className="proposal-info"><div className="proposal-top"><span className="pr-id">{p.id}</span><h3>{p.title}</h3><span className={'status '+(p.status==='Merged'?'merged':'')}>{p.status}</span></div><div className="proposal-by"><Avatar initials={p.avatar||'YK'} color={p.color||'#a8e6cf'}/><span>{p.author||'you'}</span><span>•</span><span>{p.time||'just now'}</span><span>•</span><span className="branch"><GitBranch size={13}/>{p.branch}</span>{pullRequestUrl&&<><span>•</span><a className="pr-link" href={pullRequestUrl} target="_blank" rel="noreferrer">GitHub PR <ArrowUpRight size={12}/></a></>}</div><div className="proposal-wave"><Wave compact/><button onClick={onOpen}><Play size={14} fill="currentColor"/> A/B listen</button></div></div><div className="proposal-stats"><span><CircleDot size={14}/>{p.votes||0}</span><span><GitPullRequest size={14}/>{p.comments||0}</span><ChevronRight size={16}/></div></article>}
-function Commit({c,last}){return <div className={'commit '+(last?'last':'')}><div className="commit-line"><span className="commit-dot" style={{background:c.tone}}/><span className="commit-rail"/></div><div className="commit-body"><div className="commit-date">{c.when} <span>· {c.hash}</span></div><h3>{c.title}</h3><div className="commit-by"><Avatar initials={c.who==='you'?'YK':c.who.slice(0,2).toUpperCase()} color={c.tone}/><span>{c.who}</span></div></div><button className="commit-play"><Play size={14} fill="currentColor"/></button></div>}
-function CommitGraph({expanded=false}){const graphRef=useRef(null);const [selected,setSelected]=useState(null);useEffect(()=>{if(!graphRef.current)return;const graph=graphRef.current;const github=new GitHubGitGraphProvider({repository:'ak-2302/song-demo'});graph.provider={getCapabilities:()=>github.getCapabilities(),getHistory:async({signal,refs}={})=>{const response=await fetch(new URL(`${import.meta.env.BASE_URL}git-graph.json`,window.location.href),{signal});if(!response.ok)throw new Error('Git history could not be loaded');const page=await response.json();if(!refs?.length)return page;const visible=new Set();const commits=new Map(page.commits.map((commit)=>[commit.oid,commit]));const stack=page.refs.filter((ref)=>refs.includes(ref.name)).map((ref)=>ref.target);while(stack.length){const oid=stack.pop();if(visible.has(oid))continue;visible.add(oid);stack.push(...(commits.get(oid)?.parents||[]))}return {...page,commits:page.commits.filter((commit)=>visible.has(commit.oid))}},getCommitDetails:(...args)=>github.getCommitDetails(...args),compare:(...args)=>github.compare(...args),getFileDiff:(...args)=>github.getFileDiff(...args)};const onSelect=(event)=>setSelected(event.detail.commit);graph.addEventListener('gitgraph-commit-select',onSelect);const style=document.createElement('style');style.textContent='.subject .message,.commit-body,.oid{display:none!important}.col-description{display:none!important}.col-commit{font-size:0!important}.refs{font-size:10px!important}';graph.shadowRoot?.append(style);return()=>{graph.removeEventListener('gitgraph-commit-select',onSelect);style.remove()}},[]);return <div className={'web-git-graph-panel '+(expanded?'expanded':'')}><web-git-graph ref={graphRef} theme="light" density="comfortable" columns="commit" date-format="relative" avatars={false}/>{selected&&<div className="web-graph-audio"><div><span>Selected commit</span><b>{selected.oid?.slice(0,8)}</b></div><audio controls preload="none" src={`${API_BASE}/audio/night-transit-base.wav`} aria-label="Selected commit render"/></div>}</div>}
-function Detail({label,value}){return <div className="detail-row"><span>{label}</span><b>{value}</b></div>}
-function FileRow({name,type,size}){return <div className="file-row"><div className="file-icon"><Layers3 size={16}/></div><div><b>{name}</b><small>{type}</small></div><span>{size}</span><ChevronRight size={15}/></div>}
-function Modal({submitted,onClose,onRetry,onSubmit}){const [title,setTitle]=useState('Add a late-night texture');const [description,setDescription]=useState('Added a subtle granular layer in the second half to lift the transition into the outro.');const [error,setError]=useState('');const [retrying,setRetrying]=useState(false);const renderStatus=submitted?.renderJob?.status||submitted?.render||'queued';const baseUrl=submitted?.renderJob?.baseUrl;const proposalUrl=submitted?.renderJob?.proposalUrl;const failed=renderStatus==='failed';const pullRequestUrl=submitted?.pullRequest?.url||submitted?.pullRequest?.html_url;const submit=async()=>{setError('');try{await onSubmit({title,description})}catch(error){setError(error instanceof Error?error.message:'Proposal submission failed')}};const retry=async()=>{setRetrying(true);setError('');try{await onRetry()}catch(error){setError(error instanceof Error?error.message:'Render retry failed')}finally{setRetrying(false)}};return <div className="modal-backdrop"><div className="modal">{submitted?<><div className={failed?'success-icon render-failed':'success-icon'}>{failed?<X size={30}/>:<CheckCircle2 size={30}/>}</div><h2>{submitted.listenOnly?'A/B preview':failed?'Preview render failed':'Proposal is ready'}</h2><p>{submitted.listenOnly?'Compare the base and proposed versions below.':<>Your project snapshot was committed to <b>{submitted.branch}</b>. The trusted preview render is <b>{renderStatus}</b>{submitted.renderJob?.error&&<>: {submitted.renderJob.error}</>}.</>}</p><div className="modal-pr"><GitPullRequest size={18}/><div><b>{submitted.id} · {submitted.title}</b><small>Base {submitted.baseSha} → Head {submitted.headSha}</small></div>{pullRequestUrl?<a href={pullRequestUrl} target="_blank" rel="noreferrer" aria-label="Open GitHub pull request"><ArrowUpRight size={16}/></a>:<ArrowUpRight size={16}/>}</div><div className="render-note"><Clock3 size={16}/><span>Preview {renderStatus} · renderer {submitted.renderJob?.rendererVersion||songManifest.rendererVersion}</span></div>{baseUrl&&proposalUrl&&<div className="ab-preview"><label>Base version<audio controls preload="none" src={baseUrl}/></label><label>Proposed version<audio controls preload="none" src={proposalUrl}/></label></div>}{failed&&!submitted.listenOnly&&<button className="secondary wide" onClick={retry} disabled={retrying}>{retrying?'Retrying…':'Retry preview render'}</button>}{error&&<div className="submit-error" role="alert">{error}</div>}<button className="primary wide" onClick={onClose}>Back to Night Transit</button></>:<><div className="modal-head"><div><div className="eyebrow">PROPOSE A CHANGE</div><h2>Make Night Transit yours.</h2></div><button className="close" onClick={onClose}><X size={18}/></button></div><p className="modal-copy">Open the project in the browser DAW, save your changes, then describe what you changed for the community.</p><div className="field"><label>Change title</label><input value={title} onChange={e=>setTitle(e.target.value)}/></div><div className="field"><label>What did you change?</label><textarea value={description} onChange={e=>setDescription(e.target.value)}/></div><div className="render-note"><Clock3 size={16}/><span>Base SHA {songManifest.baseSha} · trusted renderer only</span></div>{error&&<div className="submit-error" role="alert">{error}</div>}<button className="primary wide" onClick={submit}><GitPullRequest size={16}/> Create proposal</button></>}</div></div>}
-createRoot(document.getElementById('root')).render(<App/>);
+function Avatar({ initials, color = "#a8e6cf" }) {
+  return (
+    <span className="avatar" style={{ background: color }}>
+      {initials}
+    </span>
+  );
+}
+function App() {
+  const [activeTab, setActiveTab] = useState("Overview");
+  const [showSubmit, setShowSubmit] = useState(false);
+  const [submitted, setSubmitted] = useState(null);
+  const [query, setQuery] = useState("");
+  const [dawConnected, setDawConnected] = useState(false);
+  const [proposalItems, setProposalItems] = useState(listProposals);
+  const [fileItems, setFileItems] = useState([]);
+  const [commitItems, setCommitItems] = useState(commits);
+  const [githubConfigured, setGithubConfigured] = useState(false);
+  const [githubNextAction, setGithubNextAction] = useState(null);
+  const [authConfigured, setAuthConfigured] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [rendererMode, setRendererMode] = useState("checking");
+  useEffect(() => {
+    listProposalsFromApi()
+      .then(setProposalItems)
+      .catch(() => {});
+    listFiles()
+      .then(setFileItems)
+      .catch(() => {});
+    listCommits()
+      .then(setCommitItems)
+      .catch(() => {});
+    getConfig()
+      .then((config) => {
+        setGithubConfigured(config.githubConfigured);
+        setGithubNextAction(config.nextAction || null);
+        setAuthConfigured(config.authConfigured === true);
+        return config.authConfigured ? getCurrentUser() : null;
+      })
+      .then((session) => setCurrentUser(session?.user || null))
+      .catch(() => {});
+    getHealth()
+      .then((health) => setRendererMode(health.renderer || "unknown"))
+      .catch(() => setRendererMode("unavailable"));
+  }, []);
+  const openProposal = (proposal) => {
+    setSubmitted({
+      ...proposal,
+      listenOnly: true,
+      renderJob: {
+        status: "ready",
+        previewOnly: true,
+        rendererVersion: songManifest.rendererVersion,
+        baseUrl: `${API_BASE}/audio/night-transit-base.wav`,
+        proposalUrl: `${API_BASE}/audio/night-transit-proposal.wav`,
+      },
+    });
+    setShowSubmit(true);
+  };
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">
+            <Music2 size={18} />
+          </span>
+          <span>re:sonance</span>
+          <small>beta</small>
+        </div>
+        <nav>
+          <button className="nav-active">Explore</button>
+          <button>My work</button>
+          <button>Community</button>
+        </nav>
+        <div className="top-actions">
+          <div className="search">
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search songs, creators..."
+            />
+          </div>
+          <button className="icon-btn">
+            <Bell size={18} />
+            <b className="notif">3</b>
+          </button>
+          {authConfigured && !currentUser && (
+            <a className="github-login" href={`${API_BASE}/api/auth/github`}>
+              Sign in with GitHub
+            </a>
+          )}
+          {currentUser ? (
+            <Avatar
+              initials={(currentUser.login || "YK").slice(0, 2).toUpperCase()}
+              color="#f2c6a0"
+            />
+          ) : (
+            <Avatar initials="YK" color="#f2c6a0" />
+          )}
+        </div>
+      </header>
+      <main>
+        <div className="crumbs">
+          <span>Explore</span>
+          <ChevronRight size={14} />
+          <span>Electronic</span>
+          <ChevronRight size={14} />
+          <strong>Night Transit</strong>
+        </div>
+        <section className="hero">
+          <div className="hero-copy">
+            <div className="eyebrow">
+              <span className="live-dot" /> OPEN COLLABORATION{" "}
+              <span className="dot-sep">•</span> 14 contributors
+            </div>
+            <h1>Night Transit</h1>
+            <p className="subtitle">
+              A restless, late-night electronic sketch. Find a pocket for your idea and
+              help this track become something unexpected.
+            </p>
+            <div className="hero-meta">
+              <Avatar initials="NK" color="#d9b8d8" />
+              <span>
+                Started by <b>n.kobayashi</b>
+              </span>
+              <span className="meta-sep" /> <span>Last updated 2h ago</span>
+            </div>
+          </div>
+          <div className="hero-art">
+            <div className="orb orb-a" />
+            <div className="orb orb-b" />
+            <div className="grid-lines" />
+            <div className="art-label">SIDE A / 02</div>
+            <div className="art-note">∞</div>
+          </div>
+        </section>
+        <section className="player">
+          <div className="player-main">
+            <div className="latest-render">
+              <span className="eyebrow">LATEST MAIN RENDER</span>
+              <b>Night Transit · main</b>
+            </div>
+            <audio
+              className="latest-audio"
+              controls
+              preload="metadata"
+              src={`${API_BASE}/audio/night-transit-base.wav`}
+              aria-label="Latest main branch render"
+            />
+            <Volume2 size={17} className="muted-icon" />
+          </div>
+          <div className="player-actions">
+            <button
+              className="secondary"
+              onClick={() => setDawConnected(openProject().connected)}
+            >
+              <Headphones size={16} /> {dawConnected ? "DAW connected" : "Open in DAW"}
+            </button>
+            <button className="primary" onClick={() => setShowSubmit(true)}>
+              <GitPullRequest size={16} /> Propose a change
+            </button>
+          </div>
+        </section>
+        {dawConnected && (
+          <div className="integration-banner">
+            Browser DAW connected · {songManifest.projectPath} · engine{" "}
+            {songManifest.engineCommit}
+            <button onClick={requestProjectSnapshot}>Refresh project snapshot</button>
+          </div>
+        )}
+        <div className="service-status">
+          <span className={githubConfigured ? "status-dot ready" : "status-dot"}></span>
+          {githubConfigured ? (
+            "GitHub App connected"
+          ) : githubNextAction === "register-github-app-private-key" ? (
+            <a
+              href="https://github.com/settings/apps/resonance-platform/key_pairs"
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "inherit" }}
+            >
+              GitHub App setup: private key required ↗
+            </a>
+          ) : (
+            "GitHub App not configured"
+          )}
+          <span>·</span> renderer{" "}
+          {rendererMode === "tailscale-pi"
+            ? "Pi trusted renderer"
+            : rendererMode === "github-actions"
+              ? "GitHub Actions trusted renderer"
+              : rendererMode === "worker-preview"
+                ? "Worker preview"
+                : rendererMode}
+        </div>
+        <div className="content-grid">
+          <section className="main-column">
+            <div className="tabs">
+              {["Overview", "Proposals", "History", "Files"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setActiveTab(t)}
+                  className={activeTab === t ? "tab-active" : ""}
+                >
+                  {t}
+                  {t === "Proposals" && (
+                    <span className="count">{proposalItems.length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {activeTab === "Overview" && (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <h2>Open proposals</h2>
+                    <p>Listen, leave a note, or help decide what lands next.</p>
+                  </div>
+                  <button
+                    className="text-btn"
+                    onClick={() => setActiveTab("Proposals")}
+                  >
+                    View all <ArrowUpRight size={15} />
+                  </button>
+                </div>
+                <div className="proposal-list">
+                  {proposalItems.map((p) => (
+                    <Proposal key={p.id} p={p} onOpen={() => openProposal(p)} />
+                  ))}
+                </div>
+                <div className="section-heading history-head">
+                  <div>
+                    <h2>Git history</h2>
+                    <p>Hover a commit to preview that version of the song.</p>
+                  </div>
+                  <button className="text-btn" onClick={() => setActiveTab("History")}>
+                    Open full history <ArrowUpRight size={15} />
+                  </button>
+                </div>
+                <CommitGraph commits={commitItems} />
+              </>
+            )}
+            {activeTab === "Proposals" && (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <h2>All proposals</h2>
+                    <p>{proposalItems.length} threads in Night Transit.</p>
+                  </div>
+                  <button className="primary" onClick={() => setShowSubmit(true)}>
+                    <GitPullRequest size={16} /> New proposal
+                  </button>
+                </div>
+                <div className="proposal-list">
+                  {proposalItems.map((p) => (
+                    <Proposal key={p.id} p={p} onOpen={() => openProposal(p)} />
+                  ))}
+                </div>
+              </>
+            )}
+            {activeTab === "History" && (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <h2>Sound evolution</h2>
+                    <p>Replay the moments that shaped Night Transit.</p>
+                  </div>
+                </div>
+                <CommitGraph commits={commitItems} expanded />
+              </>
+            )}
+            {activeTab === "Files" && (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <h2>Project files</h2>
+                    <p>Everything you need to remix this track.</p>
+                  </div>
+                </div>
+                <div className="files-card">
+                  {(fileItems.length
+                    ? fileItems
+                    : [
+                        {
+                          path: "project/main.od",
+                          type: "openDAW project",
+                          size: "1.8 MB",
+                        },
+                        { path: "song.json", type: "manifest", size: "2.1 KB" },
+                        {
+                          path: "credits.json",
+                          type: "contributors",
+                          size: "1.4 KB",
+                        },
+                        {
+                          path: "LICENSE",
+                          type: "CC BY-SA 4.0",
+                          size: "1.1 KB",
+                        },
+                      ]
+                  ).map((file) => (
+                    <FileRow
+                      key={file.path}
+                      name={file.path}
+                      type={file.type}
+                      size={file.size}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+          <aside className="side-column">
+            <div className="side-card task-card">
+              <div className="card-kicker">
+                <Sparkles size={15} /> GOOD FIRST CONTRIBUTIONS
+              </div>
+              <h3>What could this song use?</h3>
+              <p>
+                Small, focused changes are easier to review and more likely to make the
+                final mix.
+              </p>
+              <div className="task">
+                <span className="task-icon">♬</span>
+                <div>
+                  <b>Add a bridge texture</b>
+                  <small>Open issue · 2 comments</small>
+                </div>
+                <ChevronRight size={16} />
+              </div>
+              <div className="task">
+                <span className="task-icon">◒</span>
+                <div>
+                  <b>Tighten the hi-hat groove</b>
+                  <small>Open issue · 1 comment</small>
+                </div>
+                <ChevronRight size={16} />
+              </div>
+              <button className="full-btn">
+                See all tasks <ArrowUpRight size={15} />
+              </button>
+            </div>
+            <div className="side-card details">
+              <div className="side-title">
+                <h3>Project details</h3>
+                <Settings2 size={16} />
+              </div>
+              <Detail label="Tempo" value="128 BPM" />
+              <Detail label="Key" value="F♯ minor" />
+              <Detail label="License" value="CC BY-SA 4.0" />
+              <Detail
+                label="Engine"
+                value={`openDAW · ${songManifest.engineCommit.slice(0, 7)}`}
+              />
+              <div className="tag-row">
+                <span>electronic</span>
+                <span>ambient</span>
+                <span>night-drive</span>
+              </div>
+            </div>
+            <div className="side-card contributors">
+              <div className="side-title">
+                <h3>
+                  Contributors <span>14</span>
+                </h3>
+                <button className="more">
+                  <MoreHorizontal size={17} />
+                </button>
+              </div>
+              <div className="avatar-stack">
+                <Avatar initials="NK" color="#d9b8d8" />
+                <Avatar initials="MI" color="#a8e6cf" />
+                <Avatar initials="NW" color="#ffcad4" />
+                <Avatar initials="SK" color="#c7ceea" />
+                <Avatar initials="+10" color="#e8e4d9" />
+              </div>
+              <p>14 people have shaped this track so far.</p>
+              <button className="full-btn">
+                View credits <ArrowUpRight size={15} />
+              </button>
+            </div>
+          </aside>
+        </div>
+      </main>
+      {showSubmit && (
+        <Modal
+          submitted={submitted}
+          onClose={() => {
+            setShowSubmit(false);
+            setSubmitted(null);
+          }}
+          onRetry={async () => {
+            const job = await requestRender(submitted.id);
+            setSubmitted((value) => (value ? { ...value, renderJob: job } : value));
+          }}
+          onSubmit={async (data) => {
+            const snapshot = await requestProjectSnapshot();
+            const p = await createProposalFromApi({
+              ...data,
+              projectSnapshot: snapshot,
+            });
+            setProposalItems(await listProposalsFromApi());
+            const pullRequest = await createPullRequest(p.id);
+            const job = await requestRender(p.id);
+            setSubmitted({ ...p, pullRequest, renderJob: job });
+            const poll = async () => {
+              try {
+                const current = await getRender(job.jobId);
+                setSubmitted((value) =>
+                  value ? { ...value, renderJob: current } : value,
+                );
+                if (current.status === "queued" || current.status === "running")
+                  window.setTimeout(poll, 1500);
+              } catch (error) {
+                setSubmitted((value) =>
+                  value
+                    ? {
+                        ...value,
+                        renderJob: {
+                          ...job,
+                          status: "failed",
+                          error:
+                            error instanceof Error
+                              ? error.message
+                              : "render status failed",
+                        },
+                      }
+                    : value,
+                );
+              }
+            };
+            window.setTimeout(poll, 450);
+          }}
+        />
+      )}
+      <footer>
+        <span>re:sonance is open source music collaboration.</span>
+        <span>
+          <Github size={14} />
+          <a
+            href="https://github.com/ak-2302/platform"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {" "}
+            ak-2302/platform
+          </a>{" "}
+          <span className="dot-sep">•</span> MIT + CC
+        </span>
+      </footer>
+    </div>
+  );
+}
+function Proposal({ p, onOpen }) {
+  const pullRequestUrl = p.pullRequest?.url || p.pullRequest?.html_url;
+  return (
+    <article className="proposal">
+      <div className="proposal-icon">
+        <GitPullRequest size={18} />
+      </div>
+      <div className="proposal-info">
+        <div className="proposal-top">
+          <span className="pr-id">{p.id}</span>
+          <h3>{p.title}</h3>
+          <span className={"status " + (p.status === "Merged" ? "merged" : "")}>
+            {p.status}
+          </span>
+        </div>
+        <div className="proposal-by">
+          <Avatar initials={p.avatar || "YK"} color={p.color || "#a8e6cf"} />
+          <span>{p.author || "you"}</span>
+          <span>•</span>
+          <span>{p.time || "just now"}</span>
+          <span>•</span>
+          <span className="branch">
+            <GitBranch size={13} />
+            {p.branch}
+          </span>
+          {pullRequestUrl && (
+            <>
+              <span>•</span>
+              <a
+                className="pr-link"
+                href={pullRequestUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub PR <ArrowUpRight size={12} />
+              </a>
+            </>
+          )}
+        </div>
+        <div className="proposal-wave">
+          <Wave compact />
+          <button onClick={onOpen}>
+            <Play size={14} fill="currentColor" /> A/B listen
+          </button>
+        </div>
+      </div>
+      <div className="proposal-stats">
+        <span>
+          <CircleDot size={14} />
+          {p.votes || 0}
+        </span>
+        <span>
+          <GitPullRequest size={14} />
+          {p.comments || 0}
+        </span>
+        <ChevronRight size={16} />
+      </div>
+    </article>
+  );
+}
+function Commit({ c, last }) {
+  return (
+    <div className={"commit " + (last ? "last" : "")}>
+      <div className="commit-line">
+        <span className="commit-dot" style={{ background: c.tone }} />
+        <span className="commit-rail" />
+      </div>
+      <div className="commit-body">
+        <div className="commit-date">
+          {c.when} <span>· {c.hash}</span>
+        </div>
+        <h3>{c.title}</h3>
+        <div className="commit-by">
+          <Avatar
+            initials={c.who === "you" ? "YK" : c.who.slice(0, 2).toUpperCase()}
+            color={c.tone}
+          />
+          <span>{c.who}</span>
+        </div>
+      </div>
+      <button className="commit-play">
+        <Play size={14} fill="currentColor" />
+      </button>
+    </div>
+  );
+}
+function Detail({ label, value }) {
+  return (
+    <div className="detail-row">
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+function FileRow({ name, type, size }) {
+  return (
+    <div className="file-row">
+      <div className="file-icon">
+        <Layers3 size={16} />
+      </div>
+      <div>
+        <b>{name}</b>
+        <small>{type}</small>
+      </div>
+      <span>{size}</span>
+      <ChevronRight size={15} />
+    </div>
+  );
+}
+function Modal({ submitted, onClose, onRetry, onSubmit }) {
+  const [title, setTitle] = useState("Add a late-night texture");
+  const [description, setDescription] = useState(
+    "Added a subtle granular layer in the second half to lift the transition into the outro.",
+  );
+  const [error, setError] = useState("");
+  const [retrying, setRetrying] = useState(false);
+  const renderStatus = submitted?.renderJob?.status || submitted?.render || "queued";
+  const baseUrl = submitted?.renderJob?.baseUrl;
+  const proposalUrl = submitted?.renderJob?.proposalUrl;
+  const failed = renderStatus === "failed";
+  const pullRequestUrl =
+    submitted?.pullRequest?.url || submitted?.pullRequest?.html_url;
+  const submit = async () => {
+    setError("");
+    try {
+      await onSubmit({ title, description });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Proposal submission failed");
+    }
+  };
+  const retry = async () => {
+    setRetrying(true);
+    setError("");
+    try {
+      await onRetry();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Render retry failed");
+    } finally {
+      setRetrying(false);
+    }
+  };
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        {submitted ? (
+          <>
+            <div className={failed ? "success-icon render-failed" : "success-icon"}>
+              {failed ? <X size={30} /> : <CheckCircle2 size={30} />}
+            </div>
+            <h2>
+              {submitted.listenOnly
+                ? "A/B preview"
+                : failed
+                  ? "Preview render failed"
+                  : "Proposal is ready"}
+            </h2>
+            <p>
+              {submitted.listenOnly ? (
+                "Compare the base and proposed versions below."
+              ) : (
+                <>
+                  Your project snapshot was committed to <b>{submitted.branch}</b>. The
+                  trusted preview render is <b>{renderStatus}</b>
+                  {submitted.renderJob?.error && <>: {submitted.renderJob.error}</>}.
+                </>
+              )}
+            </p>
+            <div className="modal-pr">
+              <GitPullRequest size={18} />
+              <div>
+                <b>
+                  {submitted.id} · {submitted.title}
+                </b>
+                <small>
+                  Base {submitted.baseSha} → Head {submitted.headSha}
+                </small>
+              </div>
+              {pullRequestUrl ? (
+                <a
+                  href={pullRequestUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open GitHub pull request"
+                >
+                  <ArrowUpRight size={16} />
+                </a>
+              ) : (
+                <ArrowUpRight size={16} />
+              )}
+            </div>
+            <div className="render-note">
+              <Clock3 size={16} />
+              <span>
+                Preview {renderStatus} · renderer{" "}
+                {submitted.renderJob?.rendererVersion || songManifest.rendererVersion}
+              </span>
+            </div>
+            {baseUrl && proposalUrl && (
+              <div className="ab-preview">
+                <label>
+                  Base version
+                  <audio controls preload="none" src={baseUrl} />
+                </label>
+                <label>
+                  Proposed version
+                  <audio controls preload="none" src={proposalUrl} />
+                </label>
+              </div>
+            )}
+            {failed && !submitted.listenOnly && (
+              <button className="secondary wide" onClick={retry} disabled={retrying}>
+                {retrying ? "Retrying…" : "Retry preview render"}
+              </button>
+            )}
+            {error && (
+              <div className="submit-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="primary wide" onClick={onClose}>
+              Back to Night Transit
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="modal-head">
+              <div>
+                <div className="eyebrow">PROPOSE A CHANGE</div>
+                <h2>Make Night Transit yours.</h2>
+              </div>
+              <button className="close" onClick={onClose}>
+                <X size={18} />
+              </button>
+            </div>
+            <p className="modal-copy">
+              Open the project in the browser DAW, save your changes, then describe what
+              you changed for the community.
+            </p>
+            <div className="field">
+              <label>Change title</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>What did you change?</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="render-note">
+              <Clock3 size={16} />
+              <span>Base SHA {songManifest.baseSha} · trusted renderer only</span>
+            </div>
+            {error && (
+              <div className="submit-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="primary wide" onClick={submit}>
+              <GitPullRequest size={16} /> Create proposal
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+createRoot(document.getElementById("root")).render(<App />);
