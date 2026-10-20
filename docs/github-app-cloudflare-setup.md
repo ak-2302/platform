@@ -44,3 +44,15 @@ Invoke-RestMethod https://resonance-api.meiteya.workers.dev/api/config
 ```
 
 `githubConfigured: true` と `githubAuthMode: "github-app-private-key"` が返れば、Workerは短期Installation Tokenを自動取得できます。Private key、Token、Webhook secretはブラウザへ返しません。
+
+### PEMファイルからの一括登録
+
+秘密鍵をダウンロードできた場合は、内容をチャットや画面へ貼り付けず、次のスクリプトで登録できます。秘密値はWranglerの標準入力へ直接渡し、表示・保存しません。
+
+```powershell
+.\scripts\configure-github-app.ps1 `
+  -PrivateKeyPath "$env:USERPROFILE\Downloads\private-key.pem" `
+  -AppId "5390226" `
+  -InstallationId "173243925" `
+  -WebhookSecret "Webhook secret"
+```
