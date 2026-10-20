@@ -1,6 +1,6 @@
-const json = (body, status = 200) => new Response(JSON.stringify(body), {
+const json = (body, status = 200, cacheControl = 'no-store') => new Response(JSON.stringify(body), {
   status,
-  headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' },
+  headers: { 'content-type': 'application/json', 'cache-control': cacheControl, 'access-control-allow-origin': '*' },
 });
 
 const manifest = {
@@ -178,14 +178,14 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,authorization' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } });
-    if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview' });
+    if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview' }, 200, 'public, max-age=30, s-maxage=30');
     if (request.method === 'GET' && url.pathname === '/api/config') {
       const appReady = Boolean(env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY);
       const githubConfigured = Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || appReady) && env.GITHUB_REPOSITORY);
       const githubAuthMode = env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (appReady ? 'github-app-private-key' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured'));
       const githubSetup = { repositoryConfigured: Boolean(env.GITHUB_REPOSITORY), appIdConfigured: Boolean(env.GITHUB_APP_ID), installationIdConfigured: Boolean(env.GITHUB_INSTALLATION_ID), privateKeyConfigured: Boolean(env.GITHUB_APP_PRIVATE_KEY), webhookSecretConfigured: Boolean(env.GITHUB_WEBHOOK_SECRET) };
       const nextAction = !githubSetup.repositoryConfigured ? 'configure-repository' : (!githubSetup.privateKeyConfigured && !env.GITHUB_APP_TOKEN && !env.GITHUB_TOKEN ? 'register-github-app-private-key' : null);
-      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion });
+      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
     }
     if (request.method === 'POST' && url.pathname === '/api/webhooks/github') {
       const body = await request.text();
@@ -210,9 +210,9 @@ export default {
       }
       return json({ accepted: true, duplicate: false });
     }
-    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest);
-    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files);
-    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits);
+    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit') return json(manifest, 200, 'public, max-age=300, s-maxage=300');
+    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/files') return json(files, 200, 'public, max-age=300, s-maxage=300');
+    if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/commits') return json(commits, 200, 'public, max-age=60, s-maxage=60');
     if (request.method === 'GET' && url.pathname === '/api/songs/night-transit/proposals') return json(await loadProposals(env));
     if (request.method === 'POST' && url.pathname === '/api/songs/night-transit/proposals') {
       const input = await readJsonBody(request).catch((error) => ({ _error: error.message }));
