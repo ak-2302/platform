@@ -6,6 +6,9 @@ compatibility_date = "2026-10-19"
 # Set these as encrypted secrets in production, not in this file.
 PI_RENDERER_URL = ""
 GITHUB_REPOSITORY = "ak-2302/song-demo"
+GITHUB_OAUTH_CLIENT_ID = "Iv23liCjnejrtLF5AFCQ"
+GITHUB_OAUTH_REDIRECT_URI = "https://resonance-api.meiteya.workers.dev/api/auth/github/callback"
+GITHUB_AUTH_SUCCESS_REDIRECT = "https://resonance.xn--n8jl2g.xn--q9jyb4c/"
 
 [[d1_databases]]
 binding = "DB"

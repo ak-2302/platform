@@ -216,7 +216,8 @@ export default {
       const githubAuthMode = env.GITHUB_APP_TOKEN ? 'github-app-installation-token' : (appReady ? 'github-app-private-key' : (env.GITHUB_TOKEN ? 'server-token' : 'unconfigured'));
       const githubSetup = { repositoryConfigured: Boolean(env.GITHUB_REPOSITORY), appIdConfigured: Boolean(env.GITHUB_APP_ID), installationIdConfigured: Boolean(env.GITHUB_INSTALLATION_ID), privateKeyConfigured: Boolean(env.GITHUB_APP_PRIVATE_KEY), webhookSecretConfigured: Boolean(env.GITHUB_WEBHOOK_SECRET) };
       const nextAction = !githubSetup.repositoryConfigured ? 'configure-repository' : (!githubSetup.privateKeyConfigured && !env.GITHUB_APP_TOKEN && !env.GITHUB_TOKEN ? 'register-github-app-private-key' : null);
-      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, authConfigured, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
+      const authNextAction = authConfigured ? null : 'configure-github-oauth-secrets';
+      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, authConfigured, authNextAction, engineCommit: manifest.engineCommit, rendererVersion: manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
     }
     if (request.method === 'GET' && url.pathname === '/api/auth/github') {
       if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.GITHUB_OAUTH_REDIRECT_URI || !env.AUTH_SESSION_SECRET) return authSetupResponse();
