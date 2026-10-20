@@ -175,12 +175,6 @@ async function dispatchGithubRender(env, proposal) {
   return { jobId: `actions-${Date.now()}-${proposal.id.slice(1)}`, proposalId: proposal.id, status: 'queued', rendererVersion: 'github-actions-preview-0.1.0', baseSha: proposal.baseSha, headSha: proposal.headSha, previewOnly: true, delivery: 'github-actions' };
 }
 
-async function signJob(secret, body) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 function cookieValue(request, name) {
   const cookies = request.headers.get('cookie') || '';
   return cookies.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1) || null;
@@ -229,7 +223,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-base.wav') return new Response(previewWav('base'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', ...corsHeaders } });
     if (request.method === 'GET' && url.pathname === '/audio/night-transit-proposal.wav') return new Response(previewWav('proposal'), { headers: { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=3600', ...corsHeaders } });
-    if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions' : (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview') }, 200, 'public, max-age=30, s-maxage=30');
+    if (url.pathname === '/api/health') return json({ ok: true, service: 'resonance-worker', renderer: 'github-actions' }, 200, 'public, max-age=30, s-maxage=30');
     if (request.method === 'GET' && url.pathname === '/api/config') {
       const appReady = Boolean(env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID && env.GITHUB_APP_PRIVATE_KEY);
       const githubConfigured = Boolean((env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN || appReady) && env.GITHUB_REPOSITORY);
@@ -238,7 +232,7 @@ export default {
       const githubSetup = { repositoryConfigured: Boolean(env.GITHUB_REPOSITORY), appIdConfigured: Boolean(env.GITHUB_APP_ID), installationIdConfigured: Boolean(env.GITHUB_INSTALLATION_ID), privateKeyConfigured: Boolean(env.GITHUB_APP_PRIVATE_KEY), webhookSecretConfigured: Boolean(env.GITHUB_WEBHOOK_SECRET) };
       const nextAction = !githubSetup.repositoryConfigured ? 'configure-repository' : (!githubSetup.privateKeyConfigured && !env.GITHUB_APP_TOKEN && !env.GITHUB_TOKEN ? 'register-github-app-private-key' : null);
       const authNextAction = authConfigured ? null : 'configure-github-oauth-secrets';
-      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, authConfigured, authNextAction, renderer: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions' : (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET ? 'tailscale-pi' : 'worker-preview'), engineCommit: manifest.engineCommit, rendererVersion: env.GITHUB_ACTIONS_RENDERING === 'true' ? 'github-actions-preview-0.1.0' : manifest.rendererVersion }, 200, 'public, max-age=60, s-maxage=60');
+      return json({ githubConfigured, githubAuthMode, githubSetup, nextAction, authConfigured, authNextAction, renderer: 'github-actions', engineCommit: manifest.engineCommit, rendererVersion: 'github-actions-preview-0.1.0' }, 200, 'public, max-age=60, s-maxage=60');
     }
     if (request.method === 'GET' && url.pathname === '/api/auth/github') {
       if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.GITHUB_OAUTH_REDIRECT_URI || !env.AUTH_SESSION_SECRET) return authSetupResponse();
@@ -349,17 +343,6 @@ export default {
         return json({ error: error instanceof Error ? error.message : 'GitHub request failed' }, 502);
       }
     }
-    if (url.pathname === '/api/render' && request.method === 'POST') {
-      if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) return json({ error: 'Pi renderer is not configured' }, 503);
-      const body = await request.text();
-      const signature = await signJob(env.PI_RENDERER_SECRET, body);
-      try {
-        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
-        return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', ...corsHeaders } });
-      } catch (error) {
-        return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
-      }
-    }
     const proposalRender = url.pathname.match(/^\/api\/songs\/night-transit\/proposals\/(?:%23|#)?([0-9]+)\/render$/);
     if (proposalRender && request.method === 'POST') {
       const current = await loadProposals(env);
@@ -374,35 +357,9 @@ export default {
           return json({ error: 'GitHub Actions renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
         }
       }
-      if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
-        const body = JSON.stringify({ songId: manifest.id, proposalId: proposal.id, projectPath: manifest.projectPath, engineCommit: manifest.engineCommit, baseSha: proposal.baseSha, headSha: proposal.headSha, rendererVersion: manifest.rendererVersion });
-        const signature = await signJob(env.PI_RENDERER_SECRET, body);
-        try {
-          const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-resonance-signature': `sha256=${signature}` }, body });
-          if (upstream.ok) { const job = await upstream.clone().json().catch(() => null); if (job) await storeRenderJob(env, job); }
-          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', ...corsHeaders } });
-        } catch (error) {
-          return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
-        }
-      }
-      if (!env.PI_RENDERER_URL || !env.PI_RENDERER_SECRET) {
-        const job = { jobId: `local-${Date.now()}`, proposalId: proposal.id, status: 'ready', previewOnly: true, baseSha: manifest.baseSha, headSha: proposal.headSha, rendererVersion: 'worker-preview-synth-0.1.0', baseUrl: `${url.origin}/audio/night-transit-base.wav`, proposalUrl: `${url.origin}/audio/night-transit-proposal.wav` };
-        renderJobs.set(job.jobId, job); await storeRenderJob(env, job); return json(job, 202);
-      }
     }
     const renderStatus = url.pathname.match(/^\/api\/(?:render|renders)\/([^/]+)$/);
     if (renderStatus && request.method === 'GET') {
-      if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
-        const path = `/jobs/${encodeURIComponent(renderStatus[1])}`;
-        const signature = await signJob(env.PI_RENDERER_SECRET, '');
-        try {
-          const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}${path}`, { headers: { 'x-resonance-signature': `sha256=${signature}` } });
-          if (upstream.ok) { const job = await upstream.clone().json().catch(() => null); if (job) await storeRenderJob(env, job); }
-          return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', ...corsHeaders } });
-        } catch (error) {
-          return json({ error: 'trusted renderer unavailable', detail: error instanceof Error ? error.message : String(error), retryable: true }, 503);
-        }
-      }
       return json(await loadRenderJob(env, renderStatus[1]) || { status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
     }
     return json({ error: 'not found' }, 404);
