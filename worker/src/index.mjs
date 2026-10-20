@@ -39,10 +39,17 @@ let githubInstallationTokenCache;
 async function loadGitLog(env) {
   if (gitLogCache.expiresAt > Date.now()) return gitLogCache.value;
   const repository = env.GITHUB_REPOSITORY || 'ak-2302/song-demo';
-  const response = await fetch(`https://api.github.com/repos/${repository}/commits?sha=main&per_page=30`, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'resonance-api' } });
-  if (!response.ok) return commits;
-  const items = await response.json();
-  const value = items.map((item) => ({ hash: item.sha, title: item.commit?.message?.split('\n')[0] || 'Untitled commit', author: item.author?.login || item.commit?.author?.name || 'unknown', date: item.commit?.author?.date || '', branch: 'main', tone: ['#a8e6cf', '#ffcad4', '#c7ceea', '#e8c1a0'][item.sha.charCodeAt(0) % 4] }));
+  const headers = { accept: 'application/vnd.github+json', 'user-agent': 'resonance-api' };
+  const branchesResponse = await fetch(`https://api.github.com/repos/${repository}/branches?per_page=20`, { headers });
+  if (!branchesResponse.ok) return commits;
+  const branches = await branchesResponse.json();
+  const selectedBranches = branches.sort((a, b) => (a.name === 'main' ? -1 : b.name === 'main' ? 1 : a.name.localeCompare(b.name))).slice(0, 12);
+  const branchResults = await Promise.all(selectedBranches.map(async (branch) => {
+    const response = await fetch(`https://api.github.com/repos/${repository}/commits?sha=${encodeURIComponent(branch.name)}&per_page=20`, { headers });
+    return response.ok ? { branch: branch.name, items: await response.json() } : { branch: branch.name, items: [] };
+  }));
+  const seen = new Set();
+  const value = branchResults.flatMap(({ branch, items }) => items.map((item) => ({ item, branch })).filter(({ item }) => !seen.has(item.sha) && seen.add(item.sha)).map(({ item, branch }) => ({ hash: item.sha, title: item.commit?.message?.split('\n')[0] || 'Untitled commit', author: item.author?.login || item.commit?.author?.name || 'unknown', date: item.commit?.author?.date || '', branch, parents: item.parents?.map((parent) => parent.sha) || [], tone: ['#a8e6cf', '#ffcad4', '#c7ceea', '#e8c1a0'][item.sha.charCodeAt(0) % 4] })));
   gitLogCache = { expiresAt: Date.now() + 60_000, value: value.length ? value : commits };
   return gitLogCache.value;
 }
