@@ -3,7 +3,7 @@ const KEY = 'resonance-proposals';
 // points a visitor's browser at localhost. Set VITE_API_BASE only when the
 // API is deployed on a separate origin; otherwise the same-origin worker is
 // used in production.
-const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? 'https://resonance-api.meiteya.workers.dev' : 'http://127.0.0.1:8787');
+export const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? 'https://resonance-api.meiteya.workers.dev' : 'http://127.0.0.1:8787');
 const OPENDAW_BASE = import.meta.env.VITE_OPENDAW_URL || 'https://resonance-daw.pages.dev/';
 const OPENDAW_ORIGIN = new URL(OPENDAW_BASE).origin;
 const seed = [{id:'#42',title:'Bring the bassline forward in verse 2',author:'Mika Ito',status:'Ready for review',branch:'proposal/42-bassline',baseSha:'45e9f2a7',headSha:'d4c91a'}];
