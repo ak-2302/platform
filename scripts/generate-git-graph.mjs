@@ -27,8 +27,17 @@ while (mainStack.length) {
   mainStack.push(...(bySha.get(oid)?.parents || []));
 }
 const originRefs = branches.slice(1).map((branch) => {
-  const tip = bySha.get(branch.target);
-  const origin = tip?.parents.find((parent) => mainReachable.has(parent));
+  const branchStack = [branch.target];
+  const branchSeen = new Set();
+  let origin;
+  while (branchStack.length && !origin) {
+    const oid = branchStack.pop();
+    if (branchSeen.has(oid) || mainReachable.has(oid)) continue;
+    branchSeen.add(oid);
+    const commit = bySha.get(oid);
+    origin = commit?.parents.find((parent) => mainReachable.has(parent));
+    branchStack.push(...(commit?.parents || []));
+  }
   return origin ? { name: `refs/tags/branch-origin/${branch.name.slice('refs/heads/'.length)} ← main`, target: origin, kind: 'tag' } : null;
 }).filter(Boolean);
 const children = new Map(entries.map((commit) => [commit.oid, 0]));
