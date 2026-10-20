@@ -29,7 +29,10 @@ const server = createServer(async (req, res) => {
     return send(res, 202, jobs.get(jobId));
   }
   const match = req.url?.match(/^\/jobs\/([^/]+)$/);
-  if (req.method === 'GET' && match) return jobs.has(match[1]) ? send(res, 200, jobs.get(match[1])) : send(res, 404, { error: 'job not found' });
+  if (req.method === 'GET' && match) {
+    if (!validSignature('', req.headers['x-resonance-signature'])) return send(res, 401, { error: 'invalid signature' });
+    return jobs.has(match[1]) ? send(res, 200, jobs.get(match[1])) : send(res, 404, { error: 'job not found' });
+  }
   return send(res, 404, { error: 'not found' });
 });
 

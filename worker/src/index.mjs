@@ -253,8 +253,10 @@ export default {
     }
     const renderStatus = url.pathname.match(/^\/api\/(?:render|renders)\/([^/]+)$/);
     if (renderStatus && request.method === 'GET') {
-      if (env.PI_RENDERER_URL) {
-        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}/jobs/${encodeURIComponent(renderStatus[1])}`);
+      if (env.PI_RENDERER_URL && env.PI_RENDERER_SECRET) {
+        const path = `/jobs/${encodeURIComponent(renderStatus[1])}`;
+        const signature = await signJob(env.PI_RENDERER_SECRET, '');
+        const upstream = await fetch(`${env.PI_RENDERER_URL.replace(/\/$/, '')}${path}`, { headers: { 'x-resonance-signature': `sha256=${signature}` } });
         return new Response(upstream.body, { status: upstream.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
       }
       return renderJobs.has(renderStatus[1]) ? json(renderJobs.get(renderStatus[1])) : json({ status: 'ready', jobId: renderStatus[1], rendererVersion: manifest.rendererVersion }, 200);
